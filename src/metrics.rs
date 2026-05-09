@@ -11,6 +11,8 @@ use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use ipnetwork::IpNetwork;
 use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
+use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 use crate::config::ProxyConfig;
@@ -27,6 +29,8 @@ use crate::transport::{ListenOptions, create_listener};
 const USER_LABELED_METRICS_MAX_USERS: usize = 4096;
 // Keeps TLS-front per-domain health series bounded for large generated configs.
 const TLS_FRONT_PROFILE_HEALTH_MAX_DOMAINS: usize = 256;
+const METRICS_MAX_CONTROL_CONNECTIONS: usize = 512;
+const METRICS_HTTP_CONNECTION_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub async fn serve(
     port: u16,
@@ -184,6 +188,8 @@ async fn serve_listener(
     config_rx: tokio::sync::watch::Receiver<Arc<ProxyConfig>>,
     whitelist: Arc<Vec<IpNetwork>>,
 ) {
+    let connection_permits = Arc::new(Semaphore::new(METRICS_MAX_CONTROL_CONNECTIONS));
+
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(v) => v,
@@ -198,6 +204,18 @@ async fn serve_listener(
             continue;
         }
 
+        let connection_permit = match connection_permits.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                debug!(
+                    peer = %peer,
+                    max_connections = METRICS_MAX_CONTROL_CONNECTIONS,
+                    "Dropping metrics connection: control-plane connection budget exhausted"
+                );
+                continue;
+            }
+        };
+
         let stats = stats.clone();
         let beobachten = beobachten.clone();
         let shared_state = shared_state.clone();
@@ -205,6 +223,7 @@ async fn serve_listener(
         let tls_cache = tls_cache.clone();
         let config_rx_conn = config_rx.clone();
         tokio::spawn(async move {
+            let _connection_permit = connection_permit;
             let svc = service_fn(move |req| {
                 let stats = stats.clone();
                 let beobachten = beobachten.clone();
@@ -225,11 +244,23 @@ async fn serve_listener(
                     .await
                 }
             });
-            if let Err(e) = http1::Builder::new()
-                .serve_connection(hyper_util::rt::TokioIo::new(stream), svc)
-                .await
+            match timeout(
+                METRICS_HTTP_CONNECTION_TIMEOUT,
+                http1::Builder::new().serve_connection(hyper_util::rt::TokioIo::new(stream), svc),
+            )
+            .await
             {
-                debug!(error = %e, "Metrics connection error");
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    debug!(error = %e, "Metrics connection error");
+                }
+                Err(_) => {
+                    debug!(
+                        peer = %peer,
+                        timeout_ms = METRICS_HTTP_CONNECTION_TIMEOUT.as_millis() as u64,
+                        "Metrics connection timed out"
+                    );
+                }
             }
         });
     }

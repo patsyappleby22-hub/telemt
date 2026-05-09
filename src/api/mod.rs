@@ -5,6 +5,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
@@ -13,7 +14,8 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response, StatusCode};
 use tokio::net::TcpListener;
-use tokio::sync::{Mutex, RwLock, watch};
+use tokio::sync::{Mutex, RwLock, Semaphore, watch};
+use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 use crate::config::{ApiGrayAction, ProxyConfig};
@@ -65,6 +67,9 @@ use runtime_zero::{
     build_system_info_data,
 };
 use users::{create_user, delete_user, patch_user, rotate_secret, users_from_config};
+
+const API_MAX_CONTROL_CONNECTIONS: usize = 1024;
+const API_HTTP_CONNECTION_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub(super) struct ApiRuntimeState {
     pub(super) process_started_at_epoch_secs: u64,
@@ -167,6 +172,8 @@ pub async fn serve(
         shared.runtime_events.clone(),
     );
 
+    let connection_permits = Arc::new(Semaphore::new(API_MAX_CONTROL_CONNECTIONS));
+
     loop {
         let (stream, peer) = match listener.accept().await {
             Ok(v) => v,
@@ -176,20 +183,45 @@ pub async fn serve(
             }
         };
 
+        let connection_permit = match connection_permits.clone().try_acquire_owned() {
+            Ok(permit) => permit,
+            Err(_) => {
+                debug!(
+                    peer = %peer,
+                    max_connections = API_MAX_CONTROL_CONNECTIONS,
+                    "Dropping API connection: control-plane connection budget exhausted"
+                );
+                continue;
+            }
+        };
+
         let shared_conn = shared.clone();
         let config_rx_conn = config_rx.clone();
         tokio::spawn(async move {
+            let _connection_permit = connection_permit;
             let svc = service_fn(move |req: Request<Incoming>| {
                 let shared_req = shared_conn.clone();
                 let config_rx_req = config_rx_conn.clone();
                 async move { handle(req, peer, shared_req, config_rx_req).await }
             });
-            if let Err(error) = http1::Builder::new()
-                .serve_connection(hyper_util::rt::TokioIo::new(stream), svc)
-                .await
+            match timeout(
+                API_HTTP_CONNECTION_TIMEOUT,
+                http1::Builder::new().serve_connection(hyper_util::rt::TokioIo::new(stream), svc),
+            )
+            .await
             {
-                if !error.is_user() {
-                    debug!(error = %error, "API connection error");
+                Ok(Ok(())) => {}
+                Ok(Err(error)) => {
+                    if !error.is_user() {
+                        debug!(error = %error, "API connection error");
+                    }
+                }
+                Err(_) => {
+                    debug!(
+                        peer = %peer,
+                        timeout_ms = API_HTTP_CONNECTION_TIMEOUT.as_millis() as u64,
+                        "API connection timed out"
+                    );
                 }
             }
         });
