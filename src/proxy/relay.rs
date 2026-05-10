@@ -518,10 +518,7 @@ impl<S: AsyncRead + Unpin> AsyncRead for StatsIo<S> {
             Poll::Ready(Ok(n)) => {
                 if reserved_read_bytes > n as u64 {
                     let refund_bytes = reserved_read_bytes - n as u64;
-                    refund_reserved_quota_bytes(
-                        this.user_stats.as_ref(),
-                        refund_bytes,
-                    );
+                    refund_reserved_quota_bytes(this.user_stats.as_ref(), refund_bytes);
                     this.stats.add_quota_refund_bytes_total(refund_bytes);
                 }
                 if n > 0 {
@@ -538,7 +535,6 @@ impl<S: AsyncRead + Unpin> AsyncRead for StatsIo<S> {
                                 this.quota_bytes_since_check = 0;
                             }
                         }
-
                     }
                     if let Some(limit) = this.quota_limit
                         && this.user_stats.quota_used() >= limit
@@ -700,10 +696,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for StatsIo<S> {
             Poll::Ready(Ok(n)) => {
                 if reserved_bytes > n as u64 {
                     let refund_bytes = reserved_bytes - n as u64;
-                    refund_reserved_quota_bytes(
-                        this.user_stats.as_ref(),
-                        refund_bytes,
-                    );
+                    refund_reserved_quota_bytes(this.user_stats.as_ref(), refund_bytes);
                     this.stats.add_quota_refund_bytes_total(refund_bytes);
                 }
                 if shaper_reserved_bytes > n as u64

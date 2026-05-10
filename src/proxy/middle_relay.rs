@@ -1883,9 +1883,7 @@ where
     };
 
     // When client closes, but ME channel stopped as unregistered - it isnt error
-    if client_closed
-        && matches!(writer_result, Err(ProxyError::MiddleConnectionLost))
-    {
+    if client_closed && matches!(writer_result, Err(ProxyError::MiddleConnectionLost)) {
         writer_result = Ok(());
     }
 
@@ -2520,27 +2518,26 @@ where
             )
             .await?;
 
-            let write_mode =
-                match write_client_payload(
-                    client_writer,
-                    proto_tag,
-                    flags,
-                    &data,
-                    rng,
-                    frame_buf,
-                    cancel,
-                )
-                .await
-                {
-                    Ok(mode) => mode,
-                    Err(err) => {
-                        if quota_limit.is_some() {
-                            stats.add_quota_write_fail_bytes_total(data_len);
-                            stats.increment_quota_write_fail_events_total();
-                        }
-                        return Err(err);
+            let write_mode = match write_client_payload(
+                client_writer,
+                proto_tag,
+                flags,
+                &data,
+                rng,
+                frame_buf,
+                cancel,
+            )
+            .await
+            {
+                Ok(mode) => mode,
+                Err(err) => {
+                    if quota_limit.is_some() {
+                        stats.add_quota_write_fail_bytes_total(data_len);
+                        stats.increment_quota_write_fail_events_total();
                     }
-                };
+                    return Err(err);
+                }
+            };
 
             bytes_me2c.fetch_add(data_len, Ordering::Relaxed);
             if let Some(user_stats) = quota_user_stats {

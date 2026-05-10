@@ -1901,7 +1901,10 @@ where
                 .auth_expensive_checks_total
                 .fetch_add(validation_checks as u64, Ordering::Relaxed);
 
-            if config.access.is_user_source_ip_denied(user.as_str(), peer.ip()) {
+            if config
+                .access
+                .is_user_source_ip_denied(user.as_str(), peer.ip())
+            {
                 auth_probe_record_failure_in(shared, peer.ip(), Instant::now());
                 maybe_apply_server_hello_delay(config).await;
                 warn!(

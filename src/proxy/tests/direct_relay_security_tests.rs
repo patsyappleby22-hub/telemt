@@ -1519,10 +1519,7 @@ async fn direct_relay_cutover_midflight_releases_route_gauge() {
         "cutover should terminate direct relay session"
     );
     assert!(
-        matches!(
-            relay_result,
-            Err(ProxyError::RouteSwitched)
-        ),
+        matches!(relay_result, Err(ProxyError::RouteSwitched)),
         "client-visible cutover error must stay generic and avoid route-internal metadata"
     );
 
@@ -1659,10 +1656,7 @@ async fn direct_relay_cutover_storm_multi_session_keeps_generic_errors_and_relea
             .expect("direct relay task must not panic");
 
         assert!(
-            matches!(
-                relay_result,
-                Err(ProxyError::RouteSwitched)
-            ),
+            matches!(relay_result, Err(ProxyError::RouteSwitched)),
             "storm-cutover termination must remain generic for all direct sessions"
         );
     }
@@ -1965,10 +1959,7 @@ async fn adversarial_direct_relay_cutover_integrity() {
         .expect("Session must not panic");
 
     assert!(
-        matches!(
-            result,
-            Err(ProxyError::RouteSwitched)
-        ),
+        matches!(result, Err(ProxyError::RouteSwitched)),
         "Session must terminate with route switch error on cutover"
     );
 }

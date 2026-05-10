@@ -150,9 +150,10 @@ impl TlsFrontCache {
                 is_default: cached.domain == "default",
                 has_cert_info: cached.cert_info.is_some(),
                 has_cert_payload: cached.cert_payload.is_some(),
-                app_data_records: cached.app_data_records_sizes.len().max(
-                    behavior.app_data_record_sizes.len(),
-                ),
+                app_data_records: cached
+                    .app_data_records_sizes
+                    .len()
+                    .max(behavior.app_data_record_sizes.len()),
                 ticket_records: behavior.ticket_record_sizes.len(),
                 change_cipher_spec_count: behavior.change_cipher_spec_count,
                 total_app_data_len: cached.total_app_data_len,

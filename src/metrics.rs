@@ -374,10 +374,7 @@ async fn render_tls_front_profile_health(
         out,
         "# HELP telemt_tls_front_profile_age_seconds Age of cached TLS front profile data per configured domain"
     );
-    let _ = writeln!(
-        out,
-        "# TYPE telemt_tls_front_profile_age_seconds gauge"
-    );
+    let _ = writeln!(out, "# TYPE telemt_tls_front_profile_age_seconds gauge");
     let _ = writeln!(
         out,
         "# HELP telemt_tls_front_profile_app_data_records TLS front cached app-data record count per configured domain"
@@ -390,10 +387,7 @@ async fn render_tls_front_profile_health(
         out,
         "# HELP telemt_tls_front_profile_ticket_records TLS front cached ticket-like tail record count per configured domain"
     );
-    let _ = writeln!(
-        out,
-        "# TYPE telemt_tls_front_profile_ticket_records gauge"
-    );
+    let _ = writeln!(out, "# TYPE telemt_tls_front_profile_ticket_records gauge");
     let _ = writeln!(
         out,
         "# HELP telemt_tls_front_profile_change_cipher_spec_records TLS front cached ChangeCipherSpec record count per configured domain"
@@ -406,21 +400,14 @@ async fn render_tls_front_profile_health(
         out,
         "# HELP telemt_tls_front_profile_app_data_bytes TLS front cached total app-data bytes per configured domain"
     );
-    let _ = writeln!(
-        out,
-        "# TYPE telemt_tls_front_profile_app_data_bytes gauge"
-    );
+    let _ = writeln!(out, "# TYPE telemt_tls_front_profile_app_data_bytes gauge");
 
     for item in health {
         let domain = prometheus_label_value(&item.domain);
         let _ = writeln!(
             out,
             "telemt_tls_front_profile_info{{domain=\"{}\",source=\"{}\",is_default=\"{}\",has_cert_info=\"{}\",has_cert_payload=\"{}\"}} 1",
-            domain,
-            item.source,
-            item.is_default,
-            item.has_cert_info,
-            item.has_cert_payload
+            domain, item.source, item.is_default, item.has_cert_info, item.has_cert_payload
         );
         let _ = writeln!(
             out,
@@ -771,10 +758,7 @@ async fn render_metrics(
         out,
         "# HELP telemt_quota_contention_timeout_total Quota reservations that hit the bounded contention budget"
     );
-    let _ = writeln!(
-        out,
-        "# TYPE telemt_quota_contention_timeout_total counter"
-    );
+    let _ = writeln!(out, "# TYPE telemt_quota_contention_timeout_total counter");
     let _ = writeln!(
         out,
         "telemt_quota_contention_timeout_total {}",
@@ -917,10 +901,7 @@ async fn render_metrics(
         out,
         "# HELP telemt_rate_limiter_burst_bound_bytes Configured upper bound for one direct relay rate-limit burst"
     );
-    let _ = writeln!(
-        out,
-        "# TYPE telemt_rate_limiter_burst_bound_bytes gauge"
-    );
+    let _ = writeln!(out, "# TYPE telemt_rate_limiter_burst_bound_bytes gauge");
     let _ = writeln!(
         out,
         "telemt_rate_limiter_burst_bound_bytes{{direction=\"up\"}} {}",
@@ -3793,8 +3774,9 @@ mod tests {
         )));
         assert!(output.contains("telemt_connections_total 2"));
         assert!(output.contains("telemt_connections_bad_total 1"));
-        assert!(output
-            .contains("telemt_connections_bad_by_class_total{class=\"tls_handshake_bad_client\"} 1"));
+        assert!(output.contains(
+            "telemt_connections_bad_by_class_total{class=\"tls_handshake_bad_client\"} 1"
+        ));
         assert!(output.contains("telemt_handshake_timeouts_total 1"));
         assert!(output.contains("telemt_handshake_failures_by_class_total{class=\"timeout\"} 1"));
         assert!(output.contains("telemt_auth_expensive_checks_total 9"));
@@ -3910,16 +3892,21 @@ mod tests {
             output.contains("telemt_tls_front_profile_info{domain=\"fallback.example\",source=\"default\",is_default=\"true\",has_cert_info=\"false\",has_cert_payload=\"false\"} 1")
         );
         assert!(
-            output.contains("telemt_tls_front_profile_app_data_records{domain=\"primary.example\"} 2")
+            output.contains(
+                "telemt_tls_front_profile_app_data_records{domain=\"primary.example\"} 2"
+            )
         );
         assert!(
-            output.contains("telemt_tls_front_profile_ticket_records{domain=\"primary.example\"} 1")
+            output
+                .contains("telemt_tls_front_profile_ticket_records{domain=\"primary.example\"} 1")
         );
+        assert!(output.contains(
+            "telemt_tls_front_profile_change_cipher_spec_records{domain=\"primary.example\"} 1"
+        ));
         assert!(
-            output.contains("telemt_tls_front_profile_change_cipher_spec_records{domain=\"primary.example\"} 1")
-        );
-        assert!(
-            output.contains("telemt_tls_front_profile_app_data_bytes{domain=\"primary.example\"} 1536")
+            output.contains(
+                "telemt_tls_front_profile_app_data_bytes{domain=\"primary.example\"} 1536"
+            )
         );
     }
 

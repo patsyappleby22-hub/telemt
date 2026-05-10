@@ -8,8 +8,8 @@ pub mod telemetry;
 use dashmap::DashMap;
 use lru::LruCache;
 use parking_lot::Mutex;
-use std::collections::{HashMap, VecDeque};
 use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -2378,8 +2378,7 @@ impl Stats {
         self.quota_contention_total.load(Ordering::Relaxed)
     }
     pub fn get_quota_contention_timeout_total(&self) -> u64 {
-        self.quota_contention_timeout_total
-            .load(Ordering::Relaxed)
+        self.quota_contention_timeout_total.load(Ordering::Relaxed)
     }
     pub fn get_quota_acquire_cancelled_total(&self) -> u64 {
         self.quota_acquire_cancelled_total.load(Ordering::Relaxed)
@@ -2536,12 +2535,7 @@ impl Stats {
             .unwrap_or(0)
     }
 
-    pub fn load_user_quota_state(
-        &self,
-        user: &str,
-        used_bytes: u64,
-        last_reset_epoch_secs: u64,
-    ) {
+    pub fn load_user_quota_state(&self, user: &str, used_bytes: u64, last_reset_epoch_secs: u64) {
         let stats = self.get_or_create_user_stats_handle(user);
         stats.quota_used.store(used_bytes, Ordering::Relaxed);
         stats

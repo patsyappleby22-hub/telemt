@@ -492,14 +492,10 @@ pub(crate) fn spawn_tcp_accept_loops(
                                 let handshake_close_reason =
                                     expected_handshake_close_description(&e);
 
-                                let me_closed = matches!(
-                                    &e,
-                                    crate::error::ProxyError::MiddleConnectionLost
-                                );
-                                let route_switched = matches!(
-                                    &e,
-                                    crate::error::ProxyError::RouteSwitched
-                                );
+                                let me_closed =
+                                    matches!(&e, crate::error::ProxyError::MiddleConnectionLost);
+                                let route_switched =
+                                    matches!(&e, crate::error::ProxyError::RouteSwitched);
 
                                 match (peer_close_reason, me_closed) {
                                     (Some(reason), _) => {

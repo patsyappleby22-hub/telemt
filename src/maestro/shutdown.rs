@@ -8,8 +8,8 @@
 //!
 //! SIGHUP is handled separately in config/hot_reload.rs for config reload.
 
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[cfg(not(unix))]
@@ -52,7 +52,14 @@ pub(crate) async fn wait_for_shutdown(
     quota_state_path: PathBuf,
 ) {
     let signal = wait_for_shutdown_signal().await;
-    perform_shutdown(signal, process_started_at, me_pool, &stats, quota_state_path).await;
+    perform_shutdown(
+        signal,
+        process_started_at,
+        me_pool,
+        &stats,
+        quota_state_path,
+    )
+    .await;
 }
 
 /// Waits for any shutdown signal (SIGINT, SIGTERM, SIGQUIT).

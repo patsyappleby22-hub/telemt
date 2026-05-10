@@ -187,12 +187,8 @@ fn poll_read_once<R: AsyncRead + Unpin>(
 #[test]
 fn direct_c2s_quota_refunds_unused_on_short_read() {
     let user = "direct-c2s-short-read-refund-user";
-    let (mut io, stats, read_calls, quota_exceeded) = make_stats_io_with_read_script(
-        user,
-        64,
-        0,
-        vec![ReadStep::Data(vec![0x11; 5])],
-    );
+    let (mut io, stats, read_calls, quota_exceeded) =
+        make_stats_io_with_read_script(user, 64, 0, vec![ReadStep::Data(vec![0x11; 5])]);
     let mut storage = [0u8; 16];
 
     let n = match poll_read_once(&mut io, &mut storage) {

@@ -621,10 +621,7 @@ fn collect_unknown_config_keys(parsed_toml: &toml::Value) -> Vec<UnknownConfigKe
         }
     }
 
-    if let Some(upstreams) = parsed_toml
-        .get("upstreams")
-        .and_then(toml::Value::as_array)
-    {
+    if let Some(upstreams) = parsed_toml.get("upstreams").and_then(toml::Value::as_array) {
         for (idx, upstream) in upstreams.iter().enumerate() {
             check_nested_table_value(
                 &mut unknown,

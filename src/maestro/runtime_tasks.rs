@@ -75,7 +75,9 @@ pub(crate) async fn spawn_runtime_tasks(
 
     let stats_maintenance = stats.clone();
     tokio::spawn(async move {
-        stats_maintenance.run_periodic_user_stats_maintenance().await;
+        stats_maintenance
+            .run_periodic_user_stats_maintenance()
+            .await;
     });
 
     let ip_tracker_maintenance = ip_tracker.clone();

@@ -1002,12 +1002,7 @@ impl RunningClientHandler {
                     trusted = ?self.config.server.proxy_protocol_trusted_cidrs,
                     "Rejecting PROXY protocol header from untrusted source"
                 );
-                record_beobachten_class(
-                    &self.beobachten,
-                    &self.config,
-                    self.peer.ip(),
-                    "other",
-                );
+                record_beobachten_class(&self.beobachten, &self.config, self.peer.ip(), "other");
                 return Err(ProxyError::InvalidProxyProtocol);
             }
 
