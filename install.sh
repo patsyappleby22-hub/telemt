@@ -392,7 +392,7 @@ verify_common() {
 
     if [ "$(id -u)" -eq 0 ]; then
         SUDO=""
-        if [ "$(id -u)" -ne 0 ]; then
+        if [ "${USER:-}" != "root" ] && [ "${LOGNAME:-}" != "root" ]; then
             die "$L_ERR_INCORR_ROOT_LOGIN"
         fi
     else
