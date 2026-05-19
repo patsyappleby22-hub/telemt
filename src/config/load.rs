@@ -31,6 +31,49 @@ fn is_valid_tls_domain_name(domain: &str) -> bool {
             .any(|ch| ch.is_whitespace() || matches!(ch, '/' | '\\'))
 }
 
+fn normalize_domain_to_ascii(domain: &str, field: &str) -> Result<String> {
+    let domain = domain.trim();
+    if !is_valid_tls_domain_name(domain) {
+        return Err(ProxyError::Config(format!(
+            "Invalid {field}: '{}'. Must be a valid domain name",
+            domain
+        )));
+    }
+
+    let parsed = url::Url::parse(&format!("https://{domain}/")).map_err(|error| {
+        ProxyError::Config(format!(
+            "Invalid {field}: '{}'. IDNA conversion failed: {error}",
+            domain
+        ))
+    })?;
+    let host = parsed.host_str().ok_or_else(|| {
+        ProxyError::Config(format!("Invalid {field}: '{}'. Host is empty", domain))
+    })?;
+    Ok(host.to_ascii_lowercase())
+}
+
+fn normalize_mask_host_to_ascii(host: &str, field: &str) -> Result<String> {
+    let host = host.trim();
+    if host.starts_with('[') && host.ends_with(']') {
+        let inner = &host[1..host.len() - 1];
+        let ip = inner.parse::<std::net::IpAddr>().map_err(|_| {
+            ProxyError::Config(format!("Invalid {field}: '{}'. IPv6 literal is invalid", host))
+        })?;
+        return match ip {
+            std::net::IpAddr::V6(v6) => Ok(format!("[{v6}]")),
+            std::net::IpAddr::V4(v4) => Ok(v4.to_string()),
+        };
+    }
+    if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+        return match ip {
+            std::net::IpAddr::V4(v4) => Ok(v4.to_string()),
+            std::net::IpAddr::V6(v6) => Ok(format!("[{v6}]")),
+        };
+    }
+
+    normalize_domain_to_ascii(host, field)
+}
+
 fn parse_exclusive_mask_target(target: &str) -> Option<(&str, u16)> {
     let target = target.trim();
     if target.is_empty() {
@@ -53,6 +96,17 @@ fn parse_exclusive_mask_target(target: &str) -> Option<(&str, u16)> {
     }
     let port = port.parse::<u16>().ok()?;
     (port > 0).then_some((host, port))
+}
+
+fn normalize_exclusive_mask_target(target: &str, field: &str) -> Result<String> {
+    let (host, port) = parse_exclusive_mask_target(target).ok_or_else(|| {
+        ProxyError::Config(format!(
+            "Invalid {field}: '{}'. Expected host:port with port > 0",
+            target
+        ))
+    })?;
+    let host = normalize_mask_host_to_ascii(host, field)?;
+    Ok(format!("{host}:{port}"))
 }
 
 const TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
@@ -1912,10 +1966,8 @@ impl ProxyConfig {
             }
         }
 
-        // Validate tls_domain.
-        if config.censorship.tls_domain.is_empty() {
-            return Err(ProxyError::Config("tls_domain cannot be empty".to_string()));
-        }
+        config.censorship.tls_domain =
+            normalize_domain_to_ascii(&config.censorship.tls_domain, "censorship.tls_domain")?;
 
         // Validate mask_unix_sock.
         if let Some(ref sock_path) = config.censorship.mask_unix_sock {
@@ -1941,6 +1993,10 @@ impl ProxyConfig {
                     "mask_unix_sock and mask_host are mutually exclusive".to_string(),
                 ));
             }
+        }
+
+        if let Some(mask_host) = config.censorship.mask_host.as_mut() {
+            *mask_host = normalize_mask_host_to_ascii(mask_host, "censorship.mask_host")?;
         }
 
         // Default mask_host to tls_domain if not set and no unix socket configured.
@@ -1993,8 +2049,11 @@ impl ProxyConfig {
             let mut all = Vec::with_capacity(1 + config.censorship.tls_domains.len());
             all.push(config.censorship.tls_domain.clone());
             for d in std::mem::take(&mut config.censorship.tls_domains) {
-                if !d.is_empty() && !all.contains(&d) {
-                    all.push(d);
+                if !d.is_empty() {
+                    let domain = normalize_domain_to_ascii(&d, "censorship.tls_domains entry")?;
+                    if !all.contains(&domain) {
+                        all.push(domain);
+                    }
                 }
             }
             // keep primary as tls_domain; store remaining back to tls_domains
@@ -2002,6 +2061,20 @@ impl ProxyConfig {
                 config.censorship.tls_domains = all[1..].to_vec();
             }
         }
+
+        let mut exclusive_mask = HashMap::with_capacity(config.censorship.exclusive_mask.len());
+        for (domain, target) in std::mem::take(&mut config.censorship.exclusive_mask) {
+            let domain = normalize_domain_to_ascii(
+                &domain,
+                "censorship.exclusive_mask domain",
+            )?;
+            let target = normalize_exclusive_mask_target(
+                &target,
+                "censorship.exclusive_mask target",
+            )?;
+            exclusive_mask.insert(domain, target);
+        }
+        config.censorship.exclusive_mask = exclusive_mask;
 
         // Migration: prefer_ipv6 -> network.prefer.
         if config.general.prefer_ipv6 {
@@ -2731,20 +2804,28 @@ mod tests {
             [server]
             [access]
             [censorship]
-            tls_domain = "example.com"
+            tls_domain = "weißbiergärten.de"
+            tls_domains = ["bürgeramt.de"]
             [censorship.exclusive_mask]
-            "my-site.com" = "127.0.0.1:8443"
-            "ipv6.example" = "[::1]:9443"
+            "bürgeramt.de" = "rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz.de:443"
+            "ipv6.example" = "[::1]:443"
             "#,
         );
 
+        assert_eq!(cfg.censorship.tls_domain, "xn--weibiergrten-n9a9e.de");
         assert_eq!(
-            cfg.censorship.exclusive_mask.get("my-site.com"),
-            Some(&"127.0.0.1:8443".to_string())
+            cfg.censorship.tls_domains,
+            vec!["xn--brgeramt-n4a.de".to_string()]
+        );
+        assert_eq!(
+            cfg.censorship
+                .exclusive_mask
+                .get("xn--brgeramt-n4a.de"),
+            Some(&"xn--rindfleischetikettierungsberwachungsaufgabenbertragungsgesetz-nkgt.de:443".to_string())
         );
         assert_eq!(
             cfg.censorship.exclusive_mask.get("ipv6.example"),
-            Some(&"[::1]:9443".to_string())
+            Some(&"[::1]:443".to_string())
         );
     }
 
