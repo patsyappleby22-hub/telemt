@@ -15,7 +15,6 @@ use super::registry::ConnMeta;
 use super::wire::build_proxy_req_payload;
 use crate::config::{MeRouteNoWriterMode, MeWriterPickMode};
 use crate::error::{ProxyError, Result};
-use crate::network::IpFamily;
 use crate::stream::PooledBuffer;
 use rand::seq::SliceRandom;
 
@@ -124,9 +123,8 @@ impl MePool {
             }
 
             let mut writers_snapshot = {
-                let ws = self.writers.read().await;
+                let ws = self.writers.snapshot();
                 if ws.is_empty() {
-                    drop(ws);
                     match no_writer_mode {
                         MeRouteNoWriterMode::AsyncRecoveryFailfast => {
                             let deadline = *no_writer_deadline.get_or_insert_with(|| {
@@ -154,38 +152,32 @@ impl MePool {
                                 for _ in
                                     0..self.route_runtime.me_route_inline_recovery_attempts.max(1)
                                 {
-                                    for family in self.family_order() {
-                                        let map = match family {
-                                            IpFamily::V4 => self.proxy_map_v4.read().await.clone(),
-                                            IpFamily::V6 => self.proxy_map_v6.read().await.clone(),
-                                        };
-                                        for (dc, addrs) in &map {
-                                            for (ip, port) in addrs {
-                                                let addr = SocketAddr::new(*ip, *port);
-                                                let _ = self
-                                                    .connect_one_for_dc(
-                                                        addr,
-                                                        *dc,
-                                                        self.rng.as_ref(),
-                                                    )
-                                                    .await;
-                                            }
+                                    let preferred = self.preferred_endpoints_by_dc.load_full();
+                                    for (dc, addrs) in preferred.iter() {
+                                        for addr in addrs {
+                                            let _ = self
+                                                .connect_one_for_dc(
+                                                    *addr,
+                                                    *dc,
+                                                    self.rng.as_ref(),
+                                                )
+                                                .await;
                                         }
                                     }
-                                    if !self.writers.read().await.is_empty() {
+                                    if !self.writers.snapshot().is_empty() {
                                         break;
                                     }
                                 }
                             }
 
-                            if !self.writers.read().await.is_empty() {
+                            if !self.writers.snapshot().is_empty() {
                                 continue;
                             }
                             let deadline = *no_writer_deadline.get_or_insert_with(|| {
                                 Instant::now() + self.route_runtime.me_route_inline_recovery_wait
                             });
                             if !self.wait_for_writer_until(deadline).await {
-                                if !self.writers.read().await.is_empty() {
+                                if !self.writers.snapshot().is_empty() {
                                     continue;
                                 }
                                 self.stats.increment_me_no_writer_failfast_total();
@@ -222,7 +214,7 @@ impl MePool {
                         }
                     }
                 }
-                ws.clone()
+                ws
             };
 
             let mut candidate_indices = self
@@ -285,7 +277,12 @@ impl MePool {
                             ));
                         }
                         emergency_attempts += 1;
-                        let mut endpoints = self.endpoint_candidates_for_target_dc(routed_dc).await;
+                        let mut endpoints = self
+                            .preferred_endpoints_by_dc
+                            .load()
+                            .get(&routed_dc)
+                            .cloned()
+                            .unwrap_or_default();
                         endpoints.shuffle(&mut rand::rng());
                         for addr in endpoints {
                             if self
@@ -298,9 +295,7 @@ impl MePool {
                         }
                         tokio::time::sleep(Duration::from_millis(100 * emergency_attempts as u64))
                             .await;
-                        let ws2 = self.writers.read().await;
-                        writers_snapshot = ws2.clone();
-                        drop(ws2);
+                        writers_snapshot = self.writers.snapshot();
                         candidate_indices = self
                             .candidate_indices_for_dc(&writers_snapshot, routed_dc, false)
                             .await;
