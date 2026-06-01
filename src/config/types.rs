@@ -2065,6 +2065,20 @@ pub struct UpstreamConfig {
     /// `None` means auto-detect from runtime connectivity state.
     #[serde(default)]
     pub ipv6: Option<bool>,
+    /// Per-upstream IP family preference for Telegram DC targets.
+    /// `None` inherits the effective global `[network].prefer` decision.
+    #[serde(default)]
+    pub prefer: Option<u8>,
+}
+
+impl UpstreamConfig {
+    pub fn prefer_ipv6(&self, default_prefer_ipv6: bool) -> bool {
+        match self.prefer {
+            Some(6) => true,
+            Some(4) => false,
+            _ => default_prefer_ipv6,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
