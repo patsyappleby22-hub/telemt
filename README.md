@@ -1,4 +1,4 @@
-# Telemt - MTProxy on Rust + Tokio
+# Telemt — MTProxy on Rust + Tokio
 
 [![Latest Release](https://img.shields.io/github/v/release/telemt/telemt?color=neon)](https://github.com/telemt/telemt/releases/latest) [![Stars](https://img.shields.io/github/stars/telemt/telemt?style=social)](https://github.com/telemt/telemt/stargazers) [![Forks](https://img.shields.io/github/forks/telemt/telemt?style=social)](https://github.com/telemt/telemt/network/members)
 
@@ -8,7 +8,7 @@
 >
 > Telegram Clients TLS ClientHello has been banned by JA3 Fingerprint: we are already looking for ways to solve this problem
 >
-> You can try build your client with our Telegram Devlibrary - [tdlib-obf](https://github.com/telemt/tdlib-obf)
+> You can try build your client with our Telegram Devlibrary — [tdlib-obf](https://github.com/telemt/tdlib-obf)
 
 <p align="center">
   <a href="https://t.me/telemtrs">
@@ -26,14 +26,14 @@ curl -fsSL https://raw.githubusercontent.com/telemt/telemt/main/install.sh | sh
 - [Инструкция по быстрому запуску](docs/Quick_start/QUICK_START_GUIDE.ru.md)
 
 ## Features
-Our implementation of **TLS-fronting** is one of the most deeply debugged, focused, advanced and *almost* **"behaviorally consistent to real"**:  we are confident we have it right - [see evidence on our validation and traces](docs/FAQ.en.md#recognizability-for-dpi-and-crawler)
+Our implementation of **TLS-fronting** is one of the most deeply debugged, focused, advanced and *almost* **"behaviorally consistent to real"**:  we are confident we have it right — [see evidence on our validation and traces](docs/FAQ.en.md#recognizability-for-dpi-and-crawler)
 
 Our ***Middle-End Pool*** is fastest by design in standard scenarios, compared to other implementations of connecting to the Middle-End Proxy: non dramatically, but usual
 
 - Full support for all official MTProto proxy modes:
   - Classic;
-  - Secure - with `dd` prefix;
-  - Fake TLS - with `ee` prefix + SNI fronting;
+  - Secure — with `dd` prefix;
+  - Fake TLS — with `ee` prefix + SNI fronting;
 - Replay attack protection;
 - Optional traffic masking: forward unrecognized connections to a real web server, e.g. GitHub 🤪;
 - Configurable keepalives + timeouts + IPv6 and "Fast Mode";
@@ -73,7 +73,7 @@ telemt config.toml
 
 ## Why Rust?
 - Long-running reliability and idempotent behavior
-- Rust's deterministic resource management - RAII 
+- Rust's deterministic resource management — RAII 
 - No garbage collector
 - Memory safety and reduced attack surface
 - Tokio's asynchronous architecture
