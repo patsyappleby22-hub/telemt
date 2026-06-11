@@ -169,15 +169,15 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
       const api = makeApi(node.id)
       try {
         const res = await api.createUser(body)
-        return { node, data: res.data, synced: false }
+        return { node, data: res.data }
       } catch (e) {
         const msg = (e.message || '').toLowerCase()
         const isExists = msg.includes('exist') || msg.includes('conflict') ||
           msg.includes('http 409') || msg.includes('http 422')
         if (!isExists) throw e
-        // User already on this node — force the shared secret onto it
-        await api.rotateSecret(body.username, sharedSecret)
-        return { node, data: null, synced: true }
+        // User already on this node — rotate secret and return its links
+        const rotRes = await api.rotateSecret(body.username, sharedSecret)
+        return { node, data: rotRes.data }
       }
     }
 
@@ -187,7 +187,6 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
       node: nodes[i],
       ok: r.status === 'fulfilled',
       data: r.status === 'fulfilled' ? r.value.data : null,
-      synced: r.status === 'fulfilled' ? r.value.synced : false,
       error: r.status === 'rejected' ? r.reason?.message : null,
     }))
 
@@ -212,29 +211,23 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
     return (
       <Modal title="Пользователь создан" onClose={onClose} size="lg">
         <div className="space-y-4">
-          <div className="p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
-            <div className="text-sm font-medium text-green-300 mb-3">Общий секрет для всех нод — сохраните!</div>
+          <div className="p-4 bg-dark-700 border border-dark-500 rounded-xl">
+            <div className="text-xs text-gray-500 mb-2 uppercase tracking-wider">Секрет пользователя (уникален, скопируйте)</div>
             <div className="flex items-center gap-2">
               <code className="flex-1 font-mono text-sm bg-dark-900 px-3 py-2 rounded-lg text-yellow-300 border border-dark-600 break-all">{results.secret}</code>
               <CopyButton text={results.secret} />
             </div>
+            <div className="text-xs text-gray-600 mt-2">Этот токен уже применён на всех нодах — ссылки ниже</div>
           </div>
           <div className="space-y-2">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Прокси-ссылки по нодам</div>
-            {results.nodes.map(({ node, ok, data, synced, error }) => {
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Прокси-ссылки</div>
+            {results.nodes.map(({ node, ok, data, error }) => {
               if (!ok) return (
                 <div key={node.id} className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/30 rounded-xl text-xs text-red-300">
                   <AlertTriangle size={12} className="flex-shrink-0" />
                   <span><b>{node.name}</b>: {error}</span>
                 </div>
               )
-              if (synced) return (
-                <div key={node.id} className="flex items-center gap-2 p-3 bg-blue-950/30 border border-blue-700/30 rounded-xl text-xs text-blue-300">
-                  <Check size={12} className="flex-shrink-0 text-blue-400" />
-                  <span><b>{node.name}</b> — секрет успешно обновлён</span>
-                </div>
-              )
-              // Freshly created: data = { user: { links }, secret }
               const links = data?.user?.links ?? data?.links
               return <NodeLinksBlock key={node.id} nodeName={node.name} links={links} />
             })}
