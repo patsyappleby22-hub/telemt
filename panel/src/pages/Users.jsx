@@ -9,6 +9,38 @@ import Modal from '../components/Modal'
 import { useToast } from '../components/Toast'
 import { useNode } from '../NodeContext'
 
+function linkServerIp(link) {
+  try {
+    const m = link.match(/[?&]server=([^&]+)/)
+    return m ? decodeURIComponent(m[1]) : null
+  } catch { return null }
+}
+
+function isInvalidLink(link) {
+  const ip = linkServerIp(link)
+  if (!ip) return true
+  if (ip === '::' || ip === '::1' || ip === '0.0.0.0' || ip === '') return true
+  return false
+}
+
+function isPrivateIp(ip) {
+  if (!ip) return false
+  if (/^10\./.test(ip)) return true
+  if (/^192\.168\./.test(ip)) return true
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return true
+  if (/^127\./.test(ip)) return true
+  if (/^169\.254\./.test(ip)) return true
+  return false
+}
+
+function hasPrivateLinks(links) {
+  return links?.some(l => isPrivateIp(linkServerIp(l)))
+}
+
+function filterValidLinks(links) {
+  return (links || []).filter(l => !isInvalidLink(l))
+}
+
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
@@ -96,17 +128,37 @@ function CreateUserModal({ api, onClose, onCreated }) {
               <CopyButton text={result.secret} />
             </div>
           </div>
-          {result.user?.links?.tls?.length > 0 && (
-            <div>
-              <div className="text-xs text-gray-500 mb-2">TLS-ссылки</div>
-              {result.user.links.tls.map((l, i) => (
-                <div key={i} className="flex items-center gap-2 mb-1">
-                  <code className="flex-1 text-xs font-mono bg-dark-700 px-2 py-1.5 rounded text-gray-300 break-all">{l}</code>
-                  <CopyButton text={l} />
-                </div>
-              ))}
-            </div>
-          )}
+          {(() => {
+            const allLinks = [
+              ...filterValidLinks(result.user?.links?.tls).map(l => ['TLS', l]),
+              ...filterValidLinks(result.user?.links?.secure).map(l => ['Secure', l]),
+              ...filterValidLinks(result.user?.links?.classic).map(l => ['Classic', l]),
+            ]
+            const hasPrivate = hasPrivateLinks([
+              ...(result.user?.links?.tls || []),
+              ...(result.user?.links?.secure || []),
+              ...(result.user?.links?.classic || []),
+            ])
+            if (allLinks.length === 0 && !hasPrivate) return null
+            return (
+              <div>
+                <div className="text-xs text-gray-500 mb-2">Ссылки для подключения</div>
+                {hasPrivate && (
+                  <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
+                    <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+                    Сервер вернул приватный IP. Укажите публичный IP в конфиге telemt (<code className="font-mono">link_ip</code>), чтобы ссылки работали из интернета.
+                  </div>
+                )}
+                {allLinks.map(([type, l], i) => (
+                  <div key={i} className="flex items-center gap-2 mb-1">
+                    <span className="text-xs text-gray-500 w-12 flex-shrink-0">{type}</span>
+                    <code className="flex-1 text-xs font-mono bg-dark-700 px-2 py-1.5 rounded text-gray-300 break-all">{l}</code>
+                    <CopyButton text={l} />
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
           <button onClick={onClose} className="btn-primary w-full justify-center">Закрыть</button>
         </div>
       </Modal>
@@ -189,24 +241,38 @@ function UserDetailModal({ api, username, onClose }) {
               </div>
             </div>
           )}
-          {(user.links?.tls?.length > 0 || user.links?.classic?.length > 0 || user.links?.secure?.length > 0) && (
-            <div>
-              <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Ссылки для подключения</div>
-              <div className="space-y-2">
-                {[['TLS', user.links?.tls], ['Secure', user.links?.secure], ['Classic', user.links?.classic]].map(([type, links]) =>
-                  links?.map((link, i) => (
-                    <div key={`${type}-${i}`} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-12">{type}</span>
+          {(() => {
+            const allLinks = [
+              ...filterValidLinks(user.links?.tls).map(l => ['TLS', l]),
+              ...filterValidLinks(user.links?.secure).map(l => ['Secure', l]),
+              ...filterValidLinks(user.links?.classic).map(l => ['Classic', l]),
+            ]
+            const allRaw = [...(user.links?.tls || []), ...(user.links?.secure || []), ...(user.links?.classic || [])]
+            const hasPrivate = hasPrivateLinks(allRaw)
+            if (allLinks.length === 0 && !hasPrivate) return null
+            return (
+              <div>
+                <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Ссылки для подключения</div>
+                {hasPrivate && (
+                  <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
+                    <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+                    Обнаружен приватный IP. Укажите <code className="font-mono">link_ip</code> в конфиге telemt для корректных ссылок.
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {allLinks.map(([type, link], i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-12 flex-shrink-0">{type}</span>
                       <code className="flex-1 text-xs font-mono bg-dark-700 px-2 py-1.5 rounded text-blue-300 break-all">{link}</code>
-                      <button onClick={() => copy(link, `${type}-${i}`)} className="text-gray-500 hover:text-gray-200 flex-shrink-0">
-                        {copied[`${type}-${i}`] ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                      <button onClick={() => copy(link, i)} className="text-gray-500 hover:text-gray-200 flex-shrink-0">
+                        {copied[i] ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
                       </button>
                     </div>
-                  ))
-                )}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
       ) : (
         <div className="text-center py-8 text-gray-600">Ошибка загрузки</div>
