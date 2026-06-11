@@ -5,11 +5,10 @@ import { useNode } from '../NodeContext'
 
 const links = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Дашборд' },
-  { to: '/users', icon: Users, label: 'Пользователи' },
+  { to: '/bot', icon: Bot, label: 'Бот / Пользователи' },
   { to: '/stats', icon: BarChart2, label: 'Статистика' },
   { to: '/security', icon: Shield, label: 'Безопасность' },
   { to: '/nodes', icon: Server, label: 'Ноды' },
-  { to: '/bot', icon: Bot, label: 'Бот' },
 ]
 
 function NodePicker() {

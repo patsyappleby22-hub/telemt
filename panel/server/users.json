@@ -1,14 +1,8 @@
 [
   {
     "username": "tg_819452459",
-    "secret": "447ae3ee18d2476906b5628d18e58719",
+    "secret": "4fdb5dfc275e7d778553a2c77974118d",
     "enabled": true,
-    "expiration_rfc3339": "2026-07-16T13:42:18.680Z"
-  },
-  {
-    "username": "tg_6014789391",
-    "secret": "781af1b60b92a72ff3a4ad353d886e80",
-    "enabled": true,
-    "expiration_rfc3339": "2026-06-12T14:05:52.796Z"
+    "expiration_rfc3339": "2026-06-12T14:23:39.243Z"
   }
 ]

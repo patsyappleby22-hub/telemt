@@ -18,7 +18,7 @@ export default function App() {
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
-            <Route path="users" element={<Users />} />
+            <Route path="users" element={<Navigate to="/bot" replace />} />
             <Route path="stats" element={<Stats />} />
             <Route path="security" element={<Security />} />
             <Route path="nodes" element={<Nodes />} />

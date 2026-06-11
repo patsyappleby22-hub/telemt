@@ -804,14 +804,20 @@ app.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
 
   const currentNodes = loadNodes()
   for (const node of currentNodes) {
-    await nodeApiRequest(node, 'PATCH', `/v1/users/${encodeURIComponent(username)}`, { enabled: false })
+    // Use the correct /disable endpoint (not PATCH with enabled:false)
+    const r = await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/disable`, null)
+    // Fallback: if /disable not supported, use PATCH
+    if (!r.ok) {
+      await nodeApiRequest(node, 'PATCH', `/v1/users/${encodeURIComponent(username)}`, { enabled: false })
+    }
   }
 
   const regUsers = loadUsers()
   const regIdx = regUsers.findIndex(u => u.username === username)
   if (regIdx >= 0) { regUsers[regIdx].enabled = false; saveUsers(regUsers) }
 
-  const updated = upsertBotUser(telegramId, { has_access: false })
+  // Set subscription_until to now so it shows as expired
+  const updated = upsertBotUser(telegramId, { has_access: false, subscription_until: Date.now() })
   res.json(updated)
 })
 
