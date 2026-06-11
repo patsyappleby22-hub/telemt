@@ -207,6 +207,45 @@ app.delete('/users/:username', (req, res) => {
   res.json({ ok: true })
 })
 
+// Force re-sync all registry users (with their individual secrets) to all nodes
+app.post('/sync', async (req, res) => {
+  const currentNodes = loadNodes()
+  if (currentNodes.length === 0) return res.json({ ok: true, message: 'No nodes' })
+  const results = []
+  for (const node of currentNodes) {
+    const users = loadUsers()
+    let created = 0, updated = 0, failed = 0
+    for (const user of users) {
+      const body = { username: user.username, secret: user.secret, enabled: user.enabled !== false }
+      if (user.max_tcp_conns) body.max_tcp_conns = user.max_tcp_conns
+      if (user.data_quota_bytes) body.data_quota_bytes = user.data_quota_bytes
+      if (user.rate_limit_up_bps) body.rate_limit_up_bps = user.rate_limit_up_bps
+      if (user.rate_limit_down_bps) body.rate_limit_down_bps = user.rate_limit_down_bps
+      if (user.max_unique_ips) body.max_unique_ips = user.max_unique_ips
+      if (user.expiration_rfc3339) body.expiration_rfc3339 = user.expiration_rfc3339
+      if (user.user_ad_tag) body.user_ad_tag = user.user_ad_tag
+      const createRes = await nodeApiRequest(node, 'POST', '/v1/users', body)
+      if (createRes.ok) {
+        created++
+      } else {
+        const isConflict = createRes.status === 409 || createRes.status === 422 ||
+          (createRes.body && (createRes.body.includes('exist') || createRes.body.includes('conflict')))
+        if (isConflict) {
+          const rotRes = await nodeApiRequest(node, 'POST',
+            `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`,
+            { secret: user.secret })
+          rotRes.ok ? updated++ : failed++
+        } else {
+          failed++
+        }
+      }
+    }
+    results.push({ node: node.name, created, updated, failed, total: users.length })
+    console.log(`[force-sync] Node "${node.name}": ${created} created, ${updated} secret-updated, ${failed} failed`)
+  }
+  res.json({ ok: true, results })
+})
+
 // Serve the update-only script (no token needed, just updates binary and config)
 app.get('/update.sh', (req, res) => {
   const { node_url } = req.query

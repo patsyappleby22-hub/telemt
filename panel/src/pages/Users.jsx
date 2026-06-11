@@ -552,6 +552,21 @@ export default function Users() {
           <button onClick={() => load(true)} disabled={refreshing} className="btn-ghost">
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           </button>
+          {nodes.length > 0 && (
+            <button onClick={async () => {
+              try {
+                const r = await fetch('/proxy/sync', { method: 'POST' })
+                const d = await r.json()
+                if (d.ok) {
+                  const total = d.results?.reduce((s, n) => s + n.updated + n.created, 0) ?? 0
+                  toast(`Синхронизировано: ${total} пользователей обновлено`, 'success')
+                  load()
+                }
+              } catch { toast('Ошибка синхронизации', 'error') }
+            }} className="btn-ghost text-xs gap-1.5" title="Применить секреты из реестра ко всем нодам">
+              <Key size={13} />Синхронизировать
+            </button>
+          )}
           <button onClick={() => setModal({ type: 'create' })} className="btn-primary">
             <Plus size={15} />Добавить
           </button>
