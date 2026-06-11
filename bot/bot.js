@@ -1,10 +1,5 @@
 import { TelegramBot } from './telegram.js'
-import { readFileSync, existsSync } from 'fs'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
 import http from 'http'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
 const PANEL_API = process.env.PANEL_API || 'http://127.0.0.1:9092'
 
 // ─── Panel API client ─────────────────────────────────────────────────────────
@@ -43,19 +38,13 @@ function api(path, opts = {}) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function loadToken() {
-  const settingsFile = join(__dirname, '../panel/server/bot-settings.json')
-  if (!existsSync(settingsFile)) return ''
-  try {
-    const s = JSON.parse(readFileSync(settingsFile, 'utf8'))
-    return s.bot_token || ''
-  } catch { return '' }
+async function loadToken() {
+  const s = await api('/settings').catch(() => null)
+  return s?.bot_token && s.bot_token !== '***' ? s.bot_token : ''
 }
 
 async function getSettings() {
-  const f = join(__dirname, '../panel/server/bot-settings.json')
-  if (!existsSync(f)) return {}
-  try { return JSON.parse(readFileSync(f, 'utf8')) } catch { return {} }
+  return await api('/settings').catch(() => ({}))
 }
 
 async function getPlans() {
@@ -223,7 +212,7 @@ async function buildAccessScreen(userId, subscriptionUntil) {
 
 // ─── Bot startup ──────────────────────────────────────────────────────────────
 async function startBot() {
-  const token = loadToken()
+  const token = await loadToken()
   if (!token) {
     console.log('[bot] Токен не настроен. Добавьте токен в Панель → Бот → Настройки.')
     setTimeout(startBot, 30000)

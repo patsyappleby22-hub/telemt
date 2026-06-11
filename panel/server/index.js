@@ -1,39 +1,78 @@
 import express from 'express'
 import { request as httpRequest } from 'http'
 import { request as httpsRequest } from 'https'
-import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
+import { existsSync } from 'fs'
 import crypto from 'crypto'
+import { initDb, query } from './db.js'
 import {
-  loadBotUsers, saveBotUsers, loadPlans, savePlans,
-  loadBotSettings, saveBotSettings, loadPayments, savePayments,
+  loadBotUsers, loadPlans, savePlans,
+  loadBotSettings, saveBotSettings, loadPayments,
   upsertBotUser, getBotUser, generateProxyUsername, generateSecret
 } from './bot-db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const NODES_FILE = join(__dirname, 'nodes.json')
-const USERS_FILE = join(__dirname, 'users.json')
 
 const app = express()
 
-function loadNodes() {
-  if (!existsSync(NODES_FILE)) return []
-  try { return JSON.parse(readFileSync(NODES_FILE, 'utf8')) } catch { return [] }
+// ── Database helpers for nodes / proxy_users ─────────────────────────────────
+
+async function loadNodes() {
+  const r = await query('SELECT * FROM nodes ORDER BY created_at ASC')
+  return r.rows
 }
 
-function saveNodes(nodes) {
-  writeFileSync(NODES_FILE, JSON.stringify(nodes, null, 2))
+async function saveNode(node) {
+  await query(
+    `INSERT INTO nodes (id, name, url, auth_token, created_at)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (id) DO UPDATE SET name=$2, url=$3, auth_token=$4`,
+    [node.id, node.name, node.url, node.auth_token || null, node.created_at]
+  )
 }
 
-function loadUsers() {
-  if (!existsSync(USERS_FILE)) return []
-  try { return JSON.parse(readFileSync(USERS_FILE, 'utf8')) } catch { return [] }
+async function deleteNode(id) {
+  await query('DELETE FROM nodes WHERE id = $1', [id])
 }
 
-function saveUsers(users) {
-  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2))
+async function loadUsers() {
+  const r = await query('SELECT * FROM proxy_users ORDER BY username ASC')
+  return r.rows
 }
+
+async function saveUser(user) {
+  const {
+    username, secret, enabled = true,
+    max_tcp_conns, data_quota_bytes,
+    rate_limit_up_bps, rate_limit_down_bps,
+    max_unique_ips, expiration_rfc3339, user_ad_tag
+  } = user
+  await query(
+    `INSERT INTO proxy_users
+       (username, secret, enabled, max_tcp_conns, data_quota_bytes,
+        rate_limit_up_bps, rate_limit_down_bps, max_unique_ips,
+        expiration_rfc3339, user_ad_tag, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     ON CONFLICT (username) DO UPDATE SET
+       secret=$2, enabled=$3, max_tcp_conns=$4, data_quota_bytes=$5,
+       rate_limit_up_bps=$6, rate_limit_down_bps=$7, max_unique_ips=$8,
+       expiration_rfc3339=$9, user_ad_tag=$10, updated_at=$11`,
+    [
+      username, secret, enabled !== false,
+      max_tcp_conns || null, data_quota_bytes || null,
+      rate_limit_up_bps || null, rate_limit_down_bps || null,
+      max_unique_ips || null, expiration_rfc3339 || null,
+      user_ad_tag || null, Date.now()
+    ]
+  )
+}
+
+async function deleteUser(username) {
+  await query('DELETE FROM proxy_users WHERE username = $1', [username])
+}
+
+// ── Node API proxy helper ─────────────────────────────────────────────────────
 
 function nodeApiRequest(node, method, path, body) {
   return new Promise((resolve) => {
@@ -68,7 +107,7 @@ function nodeApiRequest(node, method, path, body) {
 }
 
 async function syncUsersToNode(node) {
-  const users = loadUsers()
+  const users = await loadUsers()
   if (users.length === 0) return
   let created = 0, updated = 0, fail = 0
   for (const user of users) {
@@ -84,7 +123,6 @@ async function syncUsersToNode(node) {
     if (res.ok) {
       created++
     } else {
-      // If user already exists — force rotate secret to match registry
       const isConflict = res.status === 409 || res.status === 422 ||
         (res.body && (res.body.includes('exist') || res.body.includes('conflict')))
       if (isConflict) {
@@ -100,70 +138,64 @@ async function syncUsersToNode(node) {
   console.log(`[sync] Node "${node.name}": ${created} created, ${updated} secret-updated, ${fail} failed (${users.length} total)`)
 }
 
-let nodes = loadNodes()
-
-// In-memory registration tokens: { token -> { name, panel_url, expires_at } }
+// In-memory registration tokens
 const regTokens = new Map()
 
 const parseJson = express.json()
 
-// --- Node CRUD ---
+// ── Node CRUD ──────────────────────────────────────────────────────────────────
 
-app.get('/nodes', (req, res) => {
+app.get('/nodes', async (req, res) => {
+  const nodes = await loadNodes()
   res.json(nodes.map(n => ({ ...n, auth_token: n.auth_token ? '***' : undefined })))
 })
 
-app.post('/nodes', parseJson, (req, res) => {
+app.post('/nodes', parseJson, async (req, res) => {
   const { name, url, auth_token } = req.body
   if (!name || !url) return res.status(400).json({ error: 'name and url required' })
   const id = crypto.randomUUID()
   const node = { id, name, url: url.replace(/\/$/, ''), auth_token: auth_token || null, created_at: Date.now() }
-  nodes.push(node)
-  saveNodes(nodes)
-  // Auto-sync all known users to the new node (async, don't block response)
+  await saveNode(node)
   syncUsersToNode(node).catch(e => console.error('[sync] Error:', e.message))
   res.json({ ...node, auth_token: auth_token ? '***' : undefined })
 })
 
-app.patch('/nodes/:id', parseJson, (req, res) => {
-  const idx = nodes.findIndex(n => n.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ error: 'Not found' })
+app.patch('/nodes/:id', parseJson, async (req, res) => {
+  const nodes = await loadNodes()
+  const node = nodes.find(n => n.id === req.params.id)
+  if (!node) return res.status(404).json({ error: 'Not found' })
   const { name, url, auth_token } = req.body
-  if (name) nodes[idx].name = name
-  if (url) nodes[idx].url = url.replace(/\/$/, '')
-  if (auth_token !== undefined) nodes[idx].auth_token = auth_token || null
-  saveNodes(nodes)
-  const n = nodes[idx]
-  res.json({ ...n, auth_token: n.auth_token ? '***' : undefined })
+  if (name) node.name = name
+  if (url) node.url = url.replace(/\/$/, '')
+  if (auth_token !== undefined) node.auth_token = auth_token || null
+  await saveNode(node)
+  res.json({ ...node, auth_token: node.auth_token ? '***' : undefined })
 })
 
-app.delete('/nodes/:id', (req, res) => {
-  const idx = nodes.findIndex(n => n.id === req.params.id)
-  if (idx === -1) return res.status(404).json({ error: 'Not found' })
-  nodes.splice(idx, 1)
-  saveNodes(nodes)
+app.delete('/nodes/:id', async (req, res) => {
+  const nodes = await loadNodes()
+  const node = nodes.find(n => n.id === req.params.id)
+  if (!node) return res.status(404).json({ error: 'Not found' })
+  await deleteNode(req.params.id)
   res.json({ ok: true })
 })
 
-// --- Auto-registration ---
+// ── Auto-registration ──────────────────────────────────────────────────────────
 
-// Create a one-time registration token
 app.post('/tokens', parseJson, (req, res) => {
   const { name, panel_url } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   if (!panel_url) return res.status(400).json({ error: 'panel_url required' })
   const token = crypto.randomBytes(24).toString('hex')
-  const expires_at = Date.now() + 30 * 60 * 1000 // 30 min
+  const expires_at = Date.now() + 30 * 60 * 1000
   regTokens.set(token, { name, panel_url, expires_at })
-  // Cleanup expired tokens
   for (const [k, v] of regTokens) {
     if (v.expires_at < Date.now()) regTokens.delete(k)
   }
   res.json({ token, expires_at })
 })
 
-// VPS calls this after installing telemt to register itself
-app.post('/register', parseJson, (req, res) => {
+app.post('/register', parseJson, async (req, res) => {
   const { token, url } = req.body
   if (!token) return res.status(400).json({ error: 'token required' })
   if (!url) return res.status(400).json({ error: 'url required' })
@@ -175,50 +207,42 @@ app.post('/register', parseJson, (req, res) => {
     return res.status(401).json({ error: 'Токен истёк' })
   }
 
-  regTokens.delete(token) // one-time use
-
+  regTokens.delete(token)
   const id = crypto.randomUUID()
   const node = { id, name: entry.name, url: url.replace(/\/$/, ''), auth_token: null, created_at: Date.now() }
-  nodes.push(node)
-  saveNodes(nodes)
+  await saveNode(node)
   console.log(`[register] New node: ${entry.name} @ ${url}`)
-  // Auto-sync all known users to the newly registered node
   setTimeout(() => syncUsersToNode(node).catch(e => console.error('[sync] Error:', e.message)), 2000)
   res.json({ ok: true, node_id: id, name: entry.name })
 })
 
-// --- User registry (stores username+secret for cross-node sync) ---
+// ── User registry ──────────────────────────────────────────────────────────────
 
-app.get('/users', (req, res) => {
-  const users = loadUsers()
-  // Never expose secrets over the wire
+app.get('/users', async (req, res) => {
+  const users = await loadUsers()
   res.json(users.map(u => ({ username: u.username, enabled: u.enabled })))
 })
 
-app.post('/users', parseJson, (req, res) => {
+app.post('/users', parseJson, async (req, res) => {
   const { username, secret, ...settings } = req.body
   if (!username || !secret) return res.status(400).json({ error: 'username and secret required' })
-  const users = loadUsers()
-  const idx = users.findIndex(u => u.username === username)
-  const entry = { username, secret, ...settings, updated_at: Date.now() }
-  if (idx >= 0) { users[idx] = entry } else { users.push(entry) }
-  saveUsers(users)
+  await saveUser({ username, secret, ...settings, updated_at: Date.now() })
   res.json({ ok: true })
 })
 
-app.delete('/users/:username', (req, res) => {
-  const users = loadUsers()
-  saveUsers(users.filter(u => u.username !== req.params.username))
+app.delete('/users/:username', async (req, res) => {
+  await deleteUser(req.params.username)
   res.json({ ok: true })
 })
 
-// Force re-sync all registry users (with their individual secrets) to all nodes
+// ── Force sync ─────────────────────────────────────────────────────────────────
+
 app.post('/sync', async (req, res) => {
-  const currentNodes = loadNodes()
+  const currentNodes = await loadNodes()
   if (currentNodes.length === 0) return res.json({ ok: true, message: 'No nodes', results: [] })
   const results = []
   for (const node of currentNodes) {
-    const users = loadUsers()
+    const users = await loadUsers()
     let created = 0, rotated = 0, recreated = 0, failed = 0
     const nodeErrors = []
     for (const user of users) {
@@ -232,54 +256,33 @@ app.post('/sync', async (req, res) => {
       if (user.user_ad_tag) body.user_ad_tag = user.user_ad_tag
 
       const createRes = await nodeApiRequest(node, 'POST', '/v1/users', body)
-      if (createRes.ok) {
-        created++
-        continue
-      }
+      if (createRes.ok) { created++; continue }
 
       const isConflict = createRes.status === 409 || createRes.status === 422 ||
         (createRes.body && (createRes.body.includes('exist') || createRes.body.includes('conflict')))
 
-      if (!isConflict) {
-        failed++
-        nodeErrors.push(`${user.username}: create failed (${createRes.status})`)
-        continue
-      }
+      if (!isConflict) { failed++; nodeErrors.push(`${user.username}: create failed (${createRes.status})`); continue }
 
-      // User already exists — try rotate-secret first
       const rotRes = await nodeApiRequest(node, 'POST',
-        `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`,
-        { secret: user.secret })
+        `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`, { secret: user.secret })
+      if (rotRes.ok) { rotated++; continue }
 
-      if (rotRes.ok) {
-        rotated++
-        continue
-      }
-
-      // rotate-secret not supported or failed — fallback: delete + recreate
-      console.log(`[sync] rotate-secret failed for "${user.username}" on node "${node.name}" (${rotRes.status}), trying delete+recreate`)
-      const delRes = await nodeApiRequest(node, 'DELETE',
-        `/v1/users/${encodeURIComponent(user.username)}`, null)
+      const delRes = await nodeApiRequest(node, 'DELETE', `/v1/users/${encodeURIComponent(user.username)}`, null)
       if (delRes.ok) {
         const reCreateRes = await nodeApiRequest(node, 'POST', '/v1/users', body)
-        if (reCreateRes.ok) {
-          recreated++
-        } else {
-          failed++
-          nodeErrors.push(`${user.username}: recreate failed (${reCreateRes.status})`)
-        }
+        reCreateRes.ok ? recreated++ : (failed++, nodeErrors.push(`${user.username}: recreate failed`))
       } else {
         failed++
         nodeErrors.push(`${user.username}: delete failed (${delRes.status})`)
       }
     }
     results.push({ node: node.name, created, rotated, recreated, failed, errors: nodeErrors, total: users.length })
-    console.log(`[sync] Node "${node.name}": ${created} created, ${rotated} rotated, ${recreated} recreated, ${failed} failed`)
   }
   res.json({ ok: true, results })
 })
 
-// Serve the update-only script (no token needed, just updates binary and config)
+// ── Install / update scripts ───────────────────────────────────────────────────
+
 app.get('/update.sh', (req, res) => {
   const { node_url } = req.query
   const B = '`'
@@ -299,12 +302,10 @@ app.get('/update.sh', (req, res) => {
     '',
     '[ -f "$BINARY" ] || die "Telemt не установлен. Используйте команду Авто-установки из панели."',
     '',
-    '# Detect public IP',
     `PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || ${B}hostname -I | awk '{print $1}'${B})`,
     '[ -z "$PUBLIC_IP" ] && die "Не удалось определить публичный IP"',
     'info "Публичный IP: $PUBLIC_IP"',
     '',
-    '# Build latest from source',
     'info "Обновляю исходники telemt..."',
     `cd "$REPO_DIR" && git fetch origin && git reset --hard ${B}git rev-parse origin/HEAD${B}`,
     'info "Собираю telemt (может занять несколько минут)..."',
@@ -314,67 +315,25 @@ app.get('/update.sh', (req, res) => {
     'systemctl stop telemt 2>/dev/null || true',
     'cp target/release/telemt "$BINARY"',
     'chmod +x "$BINARY"',
-    'info "Версия: $("$BINARY" --version 2>/dev/null || echo ok)"',
-    '',
-    '# Update public_host in config',
-    'if [ -f "$CONFIG_FILE" ]; then',
-    '  if grep -qE "^#[[:space:]]*public_host[[:space:]]*=" "$CONFIG_FILE"; then',
-    '    sed -i "s|^#[[:space:]]*public_host[[:space:]]*=.*|public_host = \\"$PUBLIC_IP\\"|" "$CONFIG_FILE"',
-    '  elif grep -q "^public_host" "$CONFIG_FILE"; then',
-    '    sed -i "s|^public_host = .*|public_host = \\"$PUBLIC_IP\\"|" "$CONFIG_FILE"',
-    '  elif grep -q "^\\[general\\.links\\]" "$CONFIG_FILE"; then',
-    '    sed -i "/^\\[general\\.links\\]/a public_host = \\"$PUBLIC_IP\\"" "$CONFIG_FILE"',
-    '  else',
-    '    printf "\\n[general.links]\\npublic_host = \\"%s\\"\\n" "$PUBLIC_IP" >> "$CONFIG_FILE"',
-    '  fi',
-    '  info "public_host = $PUBLIC_IP записан в конфиг"',
-    'fi',
-    '',
-    '# Restart service',
     'systemctl restart telemt',
-    'info "Ожидаю запуска..."',
-    'for i in $(seq 1 20); do',
-    '  systemctl is-active telemt -q && info "Telemt запущен!" && break',
-    '  [ "$i" -eq 20 ] && die "Telemt не запустился. Проверьте: journalctl -u telemt -n 50"',
-    '  sleep 1',
-    'done',
-    '',
-    'echo ""',
-    'echo "========================================"',
-    'echo "  Telemt обновлён и перезапущен!"',
-    'echo "========================================"',
-    'echo "  Публичный IP: $PUBLIC_IP"',
-    'echo "  Конфиг:       $CONFIG_FILE"',
-    'echo ""',
-    'systemctl status telemt --no-pager -l | head -8 || true',
+    'info "Telemt обновлён и перезапущен!"',
   ]
   res.setHeader('Content-Type', 'text/plain; charset=utf-8')
   res.send(lines.join('\n') + '\n')
 })
 
-// Serve the install bash script
 app.get('/setup.sh', (req, res) => {
   const { token, name, panel_url, api_port = '9091', proxy_port = '8443' } = req.query
-  if (!token || !panel_url) {
-    return res.status(400).send('# Error: token and panel_url required\n')
-  }
+  if (!token || !panel_url) return res.status(400).send('# Error: token and panel_url required\n')
 
-  const safeName = (name || 'vps').replace(/[^a-zA-Z0-9_-]/g, '_')
+  const safeName  = (name || 'vps').replace(/[^a-zA-Z0-9_-]/g, '_')
   const safePanel = panel_url.replace(/'/g, '')
   const safeToken = token.replace(/[^a-f0-9]/g, '')
+  const B = '`'
 
-  // Build the script using string array to avoid JS template literal
-  // interpolating bash variables like ${GREEN}, ${PUBLIC_IP}, etc.
-  const B = '`'  // backtick helper to avoid nesting issues
   const lines = [
     '#!/bin/bash',
     'set -euo pipefail',
-    '',
-    '# ======================================================',
-    `#  Telemt Auto-Install Script`,
-    `#  Панель: ${safePanel}`,
-    `#  Нода:   ${safeName}`,
-    '# ======================================================',
     '',
     `PANEL_URL='${safePanel}'`,
     `REG_TOKEN='${safeToken}'`,
@@ -386,86 +345,60 @@ app.get('/setup.sh', (req, res) => {
     'SERVICE_FILE=\'/etc/systemd/system/telemt.service\'',
     '',
     "RED='\\033[0;31m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'; NC='\\033[0m'",
-    'info()    { echo -e "\\n${GREEN}[+]${NC} $*"; }',
-    'warn()    { echo -e "\\n${YELLOW}[!]${NC} $*"; }',
-    'die()     { echo -e "\\n${RED}[x]${NC} $*"; exit 1; }',
+    'info() { echo -e "\\n${GREEN}[+]${NC} $*"; }',
+    'warn() { echo -e "\\n${YELLOW}[!]${NC} $*"; }',
+    'die()  { echo -e "\\n${RED}[x]${NC} $*"; exit 1; }',
     '',
     '[ "$(id -u)" -ne 0 ] && die "Запускайте скрипт от root: sudo bash setup.sh"',
     '',
-    '# --- Detect public IP ---',
     'info "Определяю публичный IP..."',
-    'PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || \\',
-    '            curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || \\',
-    "            hostname -I | awk '{print $1}')",
+    `PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}')`,
     '[ -z "$PUBLIC_IP" ] && die "Не удалось определить публичный IP"',
     'info "Публичный IP: $PUBLIC_IP"',
     '',
-    '# --- Install dependencies ---',
     'info "Устанавливаю зависимости..."',
-    'DEBIAN_FRONTEND=noninteractive',
-    'export DEBIAN_FRONTEND',
     'if command -v apt-get &>/dev/null; then',
-    '  apt-get update -qq',
-    '  apt-get install -y -qq curl wget git build-essential pkg-config libssl-dev ca-certificates',
+    '  apt-get update -qq && apt-get install -y -qq curl wget git build-essential pkg-config libssl-dev ca-certificates',
     'elif command -v yum &>/dev/null; then',
     '  yum install -y -q curl wget git gcc openssl-devel',
-    'elif command -v dnf &>/dev/null; then',
-    '  dnf install -y -q curl wget git gcc openssl-devel',
     'fi',
     '',
-    '# --- Create install directory ---',
     'mkdir -p "$INSTALL_DIR"',
     'IS_UPDATE=false',
     '[ -f "$INSTALL_DIR/telemt" ] && IS_UPDATE=true',
     '',
-    '# --- Install Rust if needed ---',
     'export PATH="$HOME/.cargo/bin:$PATH"',
     'if ! command -v cargo &>/dev/null; then',
     '  info "Устанавливаю Rust..."',
     '  curl -fsSL --retry 3 https://sh.rustup.rs | sh -s -- -y --no-modify-path >/dev/null 2>&1',
     '  export PATH="$HOME/.cargo/bin:$PATH"',
     'fi',
-    'cargo --version >/dev/null 2>&1 || die "Не удалось установить Rust. Установите вручную: https://rustup.rs"',
     '',
-    '# --- Build/update telemt from source ---',
     'REPO_URL="https://github.com/patsyappleby22-hub/telemt"',
     'SRC_DIR="/opt/telemt-src"',
     'if [ -d "$SRC_DIR/.git" ]; then',
-    '  info "Получаю обновления из репозитория..."',
     '  git -C "$SRC_DIR" fetch -q 2>/dev/null || true',
-    '  git -C "$SRC_DIR" reset --hard "$(git -C "$SRC_DIR" rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)" -q 2>/dev/null || true',
+    `  git -C "$SRC_DIR" reset --hard ${B}git -C "$SRC_DIR" rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main${B} -q 2>/dev/null || true`,
     'else',
-    '  info "Клонирую репозиторий telemt..."',
     '  rm -rf "$SRC_DIR"',
     '  git clone --depth 1 -q "$REPO_URL" "$SRC_DIR" || die "Не удалось клонировать: $REPO_URL"',
     'fi',
-    '$IS_UPDATE && { info "Останавливаю старый telemt для обновления..."; systemctl stop telemt 2>/dev/null || true; }',
-    'info "Сборка telemt (3-8 мин при первом запуске)..."',
+    '$IS_UPDATE && { systemctl stop telemt 2>/dev/null || true; }',
+    'info "Сборка telemt..."',
     'cd "$SRC_DIR"',
-    'CARGO_BUILD_JOBS=$(nproc) cargo build --release 2>&1 | grep -E "(error\\[|^error|Finished|Compiling telemt)" || true',
-    '[ -f "target/release/telemt" ] || die "Сборка не удалась. Проверьте: journalctl -u telemt -n 50"',
+    'CARGO_BUILD_JOBS=$(nproc) cargo build --release 2>&1 | grep -E "(error|Finished|Compiling telemt)" || true',
+    '[ -f "target/release/telemt" ] || die "Сборка не удалась."',
     'cp "target/release/telemt" "$INSTALL_DIR/telemt"',
     'chmod +x "$INSTALL_DIR/telemt"',
     'cd "$INSTALL_DIR"',
-    'info "Telemt обновлён: $("$INSTALL_DIR/telemt" --version 2>&1 || echo ok)"',
     '',
-    '# --- Config: update public_host if exists, create fresh if not ---',
     'SECRET=""',
     'if [ -f "$CONFIG_FILE" ]; then',
-    '  info "Конфиг уже есть — обновляю только public_host (пользователи сохранены)..."',
-    '  if grep -qE "^#[[:space:]]*public_host[[:space:]]*=" "$CONFIG_FILE"; then',
-    '    sed -i "s|^#[[:space:]]*public_host[[:space:]]*=.*|public_host = \\"${PUBLIC_IP}\\"|" "$CONFIG_FILE"',
-    '  elif grep -q "^public_host" "$CONFIG_FILE"; then',
+    '  if grep -q "^public_host" "$CONFIG_FILE"; then',
     '    sed -i "s|^public_host = .*|public_host = \\"${PUBLIC_IP}\\"|" "$CONFIG_FILE"',
-    '  elif grep -q "^\\[general\\.links\\]" "$CONFIG_FILE"; then',
-    '    sed -i "/^\\[general\\.links\\]/a public_host = \\"${PUBLIC_IP}\\"" "$CONFIG_FILE"',
-    '  else',
-    '    sed -i "1s|^|[general.links]\\npublic_host = \\"${PUBLIC_IP}\\"\\n\\n|" "$CONFIG_FILE"',
     '  fi',
-    '  info "public_host → ${PUBLIC_IP}"',
     'else',
     '  SECRET=$(openssl rand -hex 16)',
-    '  info "Создаю конфиг... Секрет дефолтного пользователя: $SECRET"',
     '  cat > "$CONFIG_FILE" << EOF',
     '[general.links]',
     'public_host = "${PUBLIC_IP}"',
@@ -485,8 +418,6 @@ app.get('/setup.sh', (req, res) => {
     'EOF',
     'fi',
     '',
-    '# --- Systemd service ---',
-    'info "Настраиваю systemd сервис..."',
     'cat > "$SERVICE_FILE" << UNIT',
     '[Unit]',
     'Description=Telemt MTProxy Server',
@@ -505,88 +436,40 @@ app.get('/setup.sh', (req, res) => {
     'WantedBy=multi-user.target',
     'UNIT',
     '',
-    '# --- Firewall ---',
-    'if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then',
-    '  info "Открываю порты в UFW..."',
-    '  ufw allow "${API_PORT}/tcp"   >/dev/null 2>&1 || true',
-    '  ufw allow "${PROXY_PORT}/tcp" >/dev/null 2>&1 || true',
-    'fi',
-    'if command -v firewall-cmd &>/dev/null; then',
-    '  info "Открываю порты в firewalld..."',
-    '  firewall-cmd --permanent --add-port="${API_PORT}/tcp"   >/dev/null 2>&1 || true',
-    '  firewall-cmd --permanent --add-port="${PROXY_PORT}/tcp" >/dev/null 2>&1 || true',
-    '  firewall-cmd --reload >/dev/null 2>&1 || true',
-    'fi',
-    '',
-    '# --- Start service ---',
-    'info "Запускаю telemt..."',
     'systemctl daemon-reload',
     'systemctl enable telemt >/dev/null 2>&1',
     'systemctl restart telemt',
     '',
-    '# Wait for API to come up',
     'for i in $(seq 1 20); do',
-    '  if curl -fsSL --max-time 2 "http://127.0.0.1:${API_PORT}/v1/health" >/dev/null 2>&1; then',
-    '    info "API доступен"',
-    '    break',
+    `  if curl -fsSL --max-time 2 "http://127.0.0.1:\${API_PORT}/v1/health" >/dev/null 2>&1; then`,
+    '    info "API доступен"; break',
     '  fi',
-    '  [ "$i" -eq 20 ] && die "Telemt не запустился. Проверьте: journalctl -u telemt -n 50"',
+    '  [ "$i" -eq 20 ] && die "Telemt не запустился."',
     '  sleep 1',
     'done',
     '',
-    '# --- Register with panel (always if token provided) ---',
     'if [ -n "$REG_TOKEN" ]; then',
     '  info "Регистрирую ноду в панели..."',
-    '  REG_RESPONSE=$(curl -fsSL --max-time 15 \\',
-    '    -X POST \\',
-    "    -H 'Content-Type: application/json' \\",
-    '    -d "{\\"token\\":\\"${REG_TOKEN}\\",\\"url\\":\\"http://${PUBLIC_IP}:${API_PORT}\\"}" \\',
-    '    "${PANEL_URL}/proxy/register" 2>&1)',
-    '  if echo "$REG_RESPONSE" | grep -q \'"ok":true\'; then',
-    '    info "Нода успешно зарегистрирована в панели!"',
-    '  else',
-    '    warn "Не удалось зарегистрироваться. Ответ: $REG_RESPONSE"',
-    '    warn "Добавьте ноду вручную в панели: http://${PUBLIC_IP}:${API_PORT}"',
-    '  fi',
+    `  REG_RESPONSE=$(curl -fsSL --max-time 15 -X POST -H 'Content-Type: application/json' -d "{\\"token\\":\\"${REG_TOKEN}\\",\\"url\\":\\"http://\${PUBLIC_IP}:\${API_PORT}\\"}" "\${PANEL_URL}/proxy/register" 2>&1)`,
+    `  echo "$REG_RESPONSE" | grep -q '"ok":true' && info "Нода зарегистрирована!" || warn "Не удалось зарегистрироваться: $REG_RESPONSE"`,
     'fi',
     '',
-    '# --- Summary ---',
-    'echo ""',
-    'if $IS_UPDATE; then',
-    '  echo "========================================"',
-    '  echo "  Telemt обновлён и перезапущен!"',
-    '  echo "========================================"',
-    'else',
-    '  echo "========================================"',
-    '  echo "  Telemt установлен и запущен!"',
-    '  echo "========================================"',
-    'fi',
-    'echo ""',
-    'echo "  Нода:         $NODE_NAME"',
-    'echo "  Публичный IP: $PUBLIC_IP"',
-    'echo "  API порт:     $API_PORT"',
-    'echo "  Proxy порт:   $PROXY_PORT"',
-    '[ -n "$SECRET" ] && echo "  Секрет default: $SECRET  (сохраните — показывается один раз!)"',
-    'echo "  Конфиг:       $CONFIG_FILE"',
-    'echo ""',
-    'systemctl status telemt --no-pager -l | head -10 || true',
-    'echo ""',
+    'echo "Нода: $NODE_NAME | IP: $PUBLIC_IP | API: $API_PORT | Proxy: $PROXY_PORT"',
+    '[ -n "$SECRET" ] && echo "Секрет default: $SECRET (сохраните!)"',
   ]
-
   res.setHeader('Content-Type', 'text/plain; charset=utf-8')
   res.send(lines.join('\n') + '\n')
 })
 
-// --- Proxy to remote telemt nodes ---
+// ── Proxy to remote telemt nodes ───────────────────────────────────────────────
 
-app.use('/nodes/:id/api', (req, res) => {
+app.use('/nodes/:id/api', async (req, res) => {
+  const nodes = await loadNodes()
   const node = nodes.find(n => n.id === req.params.id)
   if (!node) return res.status(404).json({ error: 'Node not found' })
 
   let targetUrl
-  try {
-    targetUrl = new URL(node.url)
-  } catch {
+  try { targetUrl = new URL(node.url) } catch {
     return res.status(500).json({ error: 'Invalid node URL' })
   }
 
@@ -601,117 +484,95 @@ app.use('/nodes/:id/api', (req, res) => {
     method: req.method,
     headers: { ...req.headers, host: targetUrl.host }
   }
-
-  if (node.auth_token) {
-    options.headers['Authorization'] = node.auth_token
-  }
-
+  if (node.auth_token) options.headers['Authorization'] = node.auth_token
   delete options.headers['content-length']
 
   const proxyReq = transport(options, (proxyRes) => {
     res.writeHead(proxyRes.statusCode, proxyRes.headers)
     proxyRes.pipe(res)
   })
-
   proxyReq.on('error', (err) => {
-    if (!res.headersSent) {
-      res.status(502).json({ ok: false, error: { message: 'Node unreachable: ' + err.message } })
-    }
+    if (!res.headersSent) res.status(502).json({ ok: false, error: { message: 'Node unreachable: ' + err.message } })
   })
-
   req.pipe(proxyReq)
 })
 
-// ============================================================
+// ══════════════════════════════════════════════════════════════════════════════
 // BOT API ROUTES
-// ============================================================
+// ══════════════════════════════════════════════════════════════════════════════
 
-// --- Plans ---
-app.get('/bot/plans', (req, res) => {
-  res.json(loadPlans())
-})
+app.get('/bot/plans', async (req, res) => { res.json(await loadPlans()) })
 
-app.post('/bot/plans', parseJson, (req, res) => {
-  const plans = req.body
-  if (!Array.isArray(plans)) return res.status(400).json({ error: 'Array expected' })
-  savePlans(plans)
+app.post('/bot/plans', parseJson, async (req, res) => {
+  if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array expected' })
+  await savePlans(req.body)
   res.json({ ok: true })
 })
 
-app.patch('/bot/plans/:id', parseJson, (req, res) => {
-  const plans = loadPlans()
+app.patch('/bot/plans/:id', parseJson, async (req, res) => {
+  const plans = await loadPlans()
   const idx = plans.findIndex(p => p.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Not found' })
   plans[idx] = { ...plans[idx], ...req.body }
-  savePlans(plans)
+  await savePlans(plans)
   res.json(plans[idx])
 })
 
-app.delete('/bot/plans/:id', (req, res) => {
-  const plans = loadPlans()
-  savePlans(plans.filter(p => p.id !== req.params.id))
+app.delete('/bot/plans/:id', async (req, res) => {
+  const plans = await loadPlans()
+  await savePlans(plans.filter(p => p.id !== req.params.id))
   res.json({ ok: true })
 })
 
-// --- Bot Settings ---
-app.get('/bot/settings', (req, res) => {
-  const s = loadBotSettings()
+app.get('/bot/settings', async (req, res) => {
+  const s = await loadBotSettings()
   res.json({ ...s, bot_token: s.bot_token ? '***' : '' })
 })
 
-app.patch('/bot/settings', parseJson, (req, res) => {
-  const cur = loadBotSettings()
+app.patch('/bot/settings', parseJson, async (req, res) => {
+  const cur = await loadBotSettings()
   const update = { ...req.body }
   if (update.bot_token === '***') delete update.bot_token
-  saveBotSettings({ ...cur, ...update })
+  await saveBotSettings({ ...cur, ...update })
   res.json({ ok: true })
 })
 
-// --- Bot Users ---
-app.get('/bot/users', (req, res) => {
-  const users = loadBotUsers()
-  res.json(users)
-})
+app.get('/bot/users', async (req, res) => { res.json(await loadBotUsers()) })
 
-app.get('/bot/users/:telegram_id', (req, res) => {
-  const u = getBotUser(Number(req.params.telegram_id))
+app.get('/bot/users/:telegram_id', async (req, res) => {
+  const u = await getBotUser(Number(req.params.telegram_id))
   if (!u) return res.status(404).json({ error: 'Not found' })
   res.json(u)
 })
 
-app.patch('/bot/users/:telegram_id', parseJson, (req, res) => {
-  const u = upsertBotUser(Number(req.params.telegram_id), req.body)
+app.patch('/bot/users/:telegram_id', parseJson, async (req, res) => {
+  const u = await upsertBotUser(Number(req.params.telegram_id), req.body)
   res.json(u)
 })
 
-app.delete('/bot/users/:telegram_id', (req, res) => {
-  const users = loadBotUsers()
-  saveBotUsers(users.filter(u => u.telegram_id !== Number(req.params.telegram_id)))
+app.delete('/bot/users/:telegram_id', async (req, res) => {
+  await query('DELETE FROM bot_users WHERE telegram_id = $1', [Number(req.params.telegram_id)])
   res.json({ ok: true })
 })
 
-// --- Payments ---
-app.get('/bot/payments', (req, res) => {
-  const payments = loadPayments()
-  res.json(payments)
-})
+app.get('/bot/payments', async (req, res) => { res.json(await loadPayments()) })
 
-app.post('/bot/payments', parseJson, (req, res) => {
-  const payments = loadPayments()
+app.post('/bot/payments', parseJson, async (req, res) => {
   const p = { id: crypto.randomUUID(), ...req.body, created_at: Date.now() }
-  payments.push(p)
-  savePayments(payments)
+  await query(
+    'INSERT INTO payments (id, telegram_id, plan_id, amount, status, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
+    [p.id, p.telegram_id || null, p.plan_id || null, p.amount || 0, p.status || 'pending', p.created_at]
+  )
   res.json(p)
 })
 
-// --- Fetch proxy links for a bot user from all nodes ---
 app.get('/bot/users/:telegram_id/links', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
-  const user = getBotUser(telegramId)
+  const user = await getBotUser(telegramId)
   if (!user || !user.proxy_username) return res.json({ links: [] })
 
   const username = user.proxy_username
-  const currentNodes = loadNodes()
+  const currentNodes = await loadNodes()
   const allLinks = []
 
   for (const node of currentNodes) {
@@ -723,77 +584,53 @@ app.get('/bot/users/:telegram_id/links', async (req, res) => {
       const tls = (links.tls || []).filter(Boolean)
       const secure = (links.secure || []).filter(Boolean)
       const classic = (links.classic || []).filter(Boolean)
-      const nodeLinks = [...tls, ...secure, ...classic]
-      if (nodeLinks.length > 0) {
-        allLinks.push(...nodeLinks)
-      }
+      allLinks.push(...tls, ...secure, ...classic)
     } catch {}
   }
 
-  // Deduplicate
-  const unique = [...new Set(allLinks)]
-  res.json({ links: unique, username })
+  res.json({ links: [...new Set(allLinks)], username })
 })
 
-// --- Bot stats summary ---
-app.get('/bot/stats', (req, res) => {
-  const users = loadBotUsers()
-  const payments = loadPayments()
+app.get('/bot/stats', async (req, res) => {
   const now = Date.now()
-  const active = users.filter(u => u.subscription_until && u.subscription_until > now).length
-  const total = users.length
-  const revenue = payments.filter(p => p.status === 'paid').reduce((s, p) => s + (p.amount || 0), 0)
-  const today = payments.filter(p => p.status === 'paid' && p.created_at > now - 86400000).reduce((s, p) => s + (p.amount || 0), 0)
-  res.json({ total_users: total, active_subscriptions: active, total_revenue: revenue, today_revenue: today })
+  const usersR = await query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE subscription_until > $1) as active FROM bot_users', [now])
+  const revR = await query(`SELECT COALESCE(SUM(amount),0) as total, COALESCE(SUM(CASE WHEN created_at > $1 THEN amount ELSE 0 END),0) as today FROM payments WHERE status='paid'`, [now - 86400000])
+  res.json({
+    total_users: Number(usersR.rows[0].total),
+    active_subscriptions: Number(usersR.rows[0].active),
+    total_revenue: Number(revR.rows[0].total),
+    today_revenue: Number(revR.rows[0].today),
+  })
 })
 
-// --- Bot subscription management (activate/deactivate) ---
 app.post('/bot/users/:telegram_id/activate', parseJson, async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const { plan_id } = req.body
-  const plans = loadPlans()
+  const plans = await loadPlans()
   const plan = plans.find(p => p.id === plan_id)
   if (!plan) return res.status(400).json({ error: 'Plan not found' })
 
-  const user = getBotUser(telegramId)
+  const user = await getBotUser(telegramId)
   const username = generateProxyUsername(telegramId)
   const secret = (user && user.proxy_secret) || generateSecret()
 
   const now = Date.now()
-  const currentUntil = (user && user.subscription_until && user.subscription_until > now)
-    ? user.subscription_until : now
+  const currentUntil = (user && user.subscription_until && user.subscription_until > now) ? user.subscription_until : now
   const newUntil = currentUntil + plan.days * 86400000
   const expirationRfc = new Date(newUntil).toISOString()
 
-  // Sync to all nodes
-  const currentNodes = loadNodes()
+  const currentNodes = await loadNodes()
   for (const node of currentNodes) {
-    const body = {
-      username,
-      secret,
-      enabled: true,
-      expiration_rfc3339: expirationRfc
-    }
+    const body = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
     const r = await nodeApiRequest(node, 'POST', '/v1/users', body)
-    if (!r.ok) {
-      await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
-    }
+    if (!r.ok) await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
   }
 
-  // Save to central users registry too
-  const regUsers = loadUsers()
-  const regIdx = regUsers.findIndex(u => u.username === username)
-  const regEntry = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
-  if (regIdx >= 0) regUsers[regIdx] = { ...regUsers[regIdx], ...regEntry }
-  else regUsers.push(regEntry)
-  saveUsers(regUsers)
+  await saveUser({ username, secret, enabled: true, expiration_rfc3339: expirationRfc })
 
-  const updated = upsertBotUser(telegramId, {
-    proxy_username: username,
-    proxy_secret: secret,
-    subscription_until: newUntil,
-    subscription_plan: plan_id,
-    has_access: true
+  const updated = await upsertBotUser(telegramId, {
+    proxy_username: username, proxy_secret: secret,
+    subscription_until: newUntil, subscription_plan: plan_id, has_access: true
   })
   res.json(updated)
 })
@@ -802,65 +639,73 @@ app.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const username = generateProxyUsername(telegramId)
 
-  const currentNodes = loadNodes()
+  const currentNodes = await loadNodes()
   for (const node of currentNodes) {
-    // Use the correct /disable endpoint (not PATCH with enabled:false)
     const r = await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/disable`, null)
-    // Fallback: if /disable not supported, use PATCH
-    if (!r.ok) {
-      await nodeApiRequest(node, 'PATCH', `/v1/users/${encodeURIComponent(username)}`, { enabled: false })
-    }
+    if (!r.ok) await nodeApiRequest(node, 'PATCH', `/v1/users/${encodeURIComponent(username)}`, { enabled: false })
   }
 
-  const regUsers = loadUsers()
-  const regIdx = regUsers.findIndex(u => u.username === username)
-  if (regIdx >= 0) { regUsers[regIdx].enabled = false; saveUsers(regUsers) }
-
-  // Set subscription_until to now so it shows as expired
-  const updated = upsertBotUser(telegramId, { has_access: false, subscription_until: Date.now() })
+  await query('UPDATE proxy_users SET enabled = FALSE, updated_at = $1 WHERE username = $2', [Date.now(), username])
+  const updated = await upsertBotUser(telegramId, { has_access: false, subscription_until: Date.now() })
   res.json(updated)
 })
 
-// --- Trial ---
 app.post('/bot/users/:telegram_id/trial', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
-  const user = getBotUser(telegramId)
+  const user = await getBotUser(telegramId)
   if (user && user.trial_used) return res.status(400).json({ error: 'Trial already used' })
 
-  const settings = loadBotSettings()
+  const settings = await loadBotSettings()
   const trialDays = settings.trial_days || 1
   const username = generateProxyUsername(telegramId)
   const secret = generateSecret()
   const newUntil = Date.now() + trialDays * 86400000
   const expirationRfc = new Date(newUntil).toISOString()
 
-  const currentNodes = loadNodes()
+  const currentNodes = await loadNodes()
   for (const node of currentNodes) {
     const body = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
     const r = await nodeApiRequest(node, 'POST', '/v1/users', body)
-    if (!r.ok) {
-      await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
-    }
+    if (!r.ok) await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
   }
 
-  const regUsers = loadUsers()
-  const regIdx = regUsers.findIndex(u => u.username === username)
-  const regEntry = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
-  if (regIdx >= 0) regUsers[regIdx] = { ...regUsers[regIdx], ...regEntry }
-  else regUsers.push(regEntry)
-  saveUsers(regUsers)
+  await saveUser({ username, secret, enabled: true, expiration_rfc3339: expirationRfc })
 
-  const updated = upsertBotUser(telegramId, {
-    proxy_username: username,
-    proxy_secret: secret,
-    subscription_until: newUntil,
-    has_access: true,
-    trial_used: true
+  const updated = await upsertBotUser(telegramId, {
+    proxy_username: username, proxy_secret: secret,
+    subscription_until: newUntil, has_access: true, trial_used: true
   })
   res.json(updated)
 })
 
-const PORT = 9092
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Proxy server running on http://127.0.0.1:${PORT}`)
-})
+// ── Serve built React frontend (production) ────────────────────────────────────
+
+const distDir = join(__dirname, '../dist')
+if (existsSync(distDir)) {
+  const { default: serveStatic } = await import('serve-static')
+  app.use(serveStatic(distDir))
+  app.get('*', (req, res) => {
+    res.sendFile(join(distDir, 'index.html'))
+  })
+}
+
+// ── Start ──────────────────────────────────────────────────────────────────────
+
+const PORT = process.env.PORT || 9092
+
+async function main() {
+  try {
+    await initDb()
+  } catch (e) {
+    console.error('[db] Failed to initialize database:', e.message)
+    if (!process.env.DATABASE_URL) {
+      console.warn('[db] DATABASE_URL not set — running without persistent database')
+    }
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Panel server running on port ${PORT}`)
+  })
+}
+
+main()

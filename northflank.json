@@ -1,0 +1,78 @@
+{
+  "$schema": "https://api.northflank.com/v1/schemas/project",
+  "project": {
+    "name": "telemt",
+    "description": "Telemt MTProxy Panel + Bot",
+    "region": "europe-west",
+    "services": [
+      {
+        "name": "panel",
+        "description": "Admin panel (React + Express + PostgreSQL)",
+        "billing": { "deploymentPlan": "nf-compute-20" },
+        "deployment": {
+          "instances": 1,
+          "docker": {
+            "configType": "customDockerfile",
+            "dockerFilePath": "/panel/Dockerfile",
+            "buildContext": "/panel",
+            "buildArguments": {}
+          }
+        },
+        "ports": [
+          {
+            "name": "http",
+            "internalPort": 3000,
+            "protocol": "HTTP",
+            "public": true,
+            "domains": []
+          }
+        ],
+        "runtimeEnvironment": {
+          "DATABASE_URL": "${POSTGRESQL_CONNECTION_STRING}",
+          "DATABASE_SSL": "true",
+          "PORT": "3000",
+          "NODE_ENV": "production"
+        },
+        "healthChecks": [
+          {
+            "protocol": "HTTP",
+            "path": "/bot/stats",
+            "port": 3000,
+            "initialDelaySeconds": 15,
+            "periodSeconds": 30,
+            "timeoutSeconds": 10,
+            "failureThreshold": 3
+          }
+        ]
+      },
+      {
+        "name": "bot",
+        "description": "Telegram Bot",
+        "billing": { "deploymentPlan": "nf-compute-10" },
+        "deployment": {
+          "instances": 1,
+          "docker": {
+            "configType": "customDockerfile",
+            "dockerFilePath": "/bot/Dockerfile",
+            "buildContext": "/bot",
+            "buildArguments": {}
+          }
+        },
+        "ports": [],
+        "runtimeEnvironment": {
+          "PANEL_API": "http://panel:3000",
+          "NODE_ENV": "production"
+        }
+      }
+    ],
+    "addons": [
+      {
+        "name": "postgres",
+        "type": "postgresql",
+        "billing": { "deploymentPlan": "nf-compute-10" },
+        "tlsEnabled": true,
+        "version": "16"
+      }
+    ]
+  }
+}

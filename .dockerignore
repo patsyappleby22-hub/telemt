@@ -6,3 +6,11 @@ cache
 tlsfront
 *.tar
 *.tar.gz
+node_modules/
+panel/node_modules/
+bot/node_modules/
+panel/dist/
+.cache/
+attached_assets/
+*.log
+.env

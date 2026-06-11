@@ -1,0 +1,1 @@
+- [Northflank deployment setup](northflank-deploy.md) — Panel+Bot dockerized for Northflank via GitHub; JSON files replaced with PostgreSQL; schema inlined in db.js.

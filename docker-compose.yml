@@ -1,45 +1,50 @@
+version: '3.9'
+
 services:
-  telemt:
-    image: ghcr.io/telemt/telemt:latest
-    build:
-      context: .
-      target: prod
-    container_name: telemt
+  db:
+    image: postgres:16-alpine
     restart: unless-stopped
-    ports:
-      - "443:443"
-      - "127.0.0.1:9090:9090"
-      - "127.0.0.1:9091:9091"
-    # Working dir uses tmpfs for caching 'proxy-secret' at runtime.
-    # Config is mounted as a directory (not a single file) so the API can
-    # atomically update config.toml via write-temp → rename within the same FS.
-    working_dir: /run/telemt
-    command: ["/etc/telemt/config.toml"]
-    volumes:
-      - ./config:/etc/telemt:rw
-    tmpfs:
-      - /run/telemt:rw,mode=1777,size=4m
     environment:
-      - RUST_LOG=info
+      POSTGRES_DB: telemt
+      POSTGRES_USER: telemt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: [ "CMD", "/app/telemt", "healthcheck", "/etc/telemt/config.toml", "--mode", "liveness" ]
-      interval: 30s
+      test: ["CMD-SHELL", "pg_isready -U telemt"]
+      interval: 5s
       timeout: 5s
-      retries: 3
-      start_period: 20s
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 262144
-    logging:
-      driver: json-file
-      options:
-        max-size: "50m"
-        max-file: "5"
+      retries: 10
+
+  panel:
+    build:
+      context: ./panel
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://telemt:${POSTGRES_PASSWORD:-changeme}@db:5432/telemt
+      DATABASE_SSL: "false"
+      PORT: "3000"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - panel
+    environment:
+      PANEL_API: http://panel:3000
+      NODE_ENV: production
+
+volumes:
+  pgdata:
