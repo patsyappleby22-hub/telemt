@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import {
   Server, Plus, Trash2, Edit2, AlertTriangle, Wifi, WifiOff,
   RefreshCw, Terminal, Copy, Check, ChevronDown, ChevronUp,
-  Zap, X, Download
+  Zap, X, Download, ArrowUpCircle
 } from 'lucide-react'
 import { useNode } from '../NodeContext'
 import { addNode, updateNode, deleteNode } from '../nodes'
@@ -51,6 +51,49 @@ function NodeStatus({ nodeId }) {
         {status ? (status.ok ? 'Онлайн' : 'Офлайн') : 'Проверить'}
       </span>
     </button>
+  )
+}
+
+// ── Update modal ───────────────────────────────────────────────────────────
+
+function UpdateModal({ node, onClose }) {
+  const panelUrl = window.location.origin
+  const cmd = `curl -fsSL '${panelUrl}/proxy/update.sh' | sudo bash`
+
+  return (
+    <Modal title={`Обновить: ${node.name}`} onClose={onClose} size="xl">
+      <div className="space-y-4">
+        <div className="p-3 bg-blue-950/30 border border-blue-700/30 rounded-xl text-xs text-gray-400 space-y-1.5">
+          <div className="text-sm font-semibold text-blue-300 flex items-center gap-2">
+            <ArrowUpCircle size={14} />Что делает скрипт
+          </div>
+          <ul className="ml-4 space-y-1 list-disc">
+            <li>Определяет публичный IP и прописывает <code className="font-mono">public_host</code> в конфиг</li>
+            <li>Обновляет telemt до последней версии из исходников</li>
+            <li>Перезапускает сервис systemd</li>
+            <li>Не трогает пользователей и секреты</li>
+          </ul>
+        </div>
+
+        <div className="p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
+          <div className="text-sm font-semibold text-green-300 mb-2 flex items-center gap-2">
+            <Terminal size={14} />Вставьте на VPS
+          </div>
+          <div className="relative">
+            <pre className="text-xs font-mono text-yellow-200 bg-dark-900 p-3 rounded-lg border border-dark-600 break-all whitespace-pre-wrap pr-24 leading-relaxed">
+              {cmd}
+            </pre>
+            <div className="absolute top-2 right-2">
+              <CopyBtn text={cmd} label="Копировать" />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose} className="btn-ghost flex-1 justify-center">Закрыть</button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -425,6 +468,11 @@ export default function Nodes() {
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-dark-600">
                 <NodeStatus nodeId={node.id} />
                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => setModal({ type: 'update', node })}
+                    title="Обновить telemt и public_host"
+                    className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors">
+                    <ArrowUpCircle size={13} />
+                  </button>
                   <button onClick={() => setModal({ type: 'edit', node })}
                     className="p-1.5 text-gray-500 hover:text-gray-200 hover:bg-dark-600 rounded transition-colors">
                     <Edit2 size={13} />
@@ -451,6 +499,7 @@ export default function Nodes() {
       {modal === 'auto' && <AutoInstallModal onClose={() => setModal(null)} onAdded={refresh} />}
       {modal === 'manual' && <AddNodeModal onClose={() => setModal(null)} onAdded={refresh} />}
       {modal?.type === 'edit' && <EditNodeModal node={modal.node} onClose={() => setModal(null)} onUpdated={refresh} />}
+      {modal?.type === 'update' && <UpdateModal node={modal.node} onClose={() => setModal(null)} />}
     </div>
   )
 }

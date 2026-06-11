@@ -146,7 +146,7 @@ function CreateUserModal({ api, onClose, onCreated }) {
                 {hasPrivate && (
                   <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
                     <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
-                    Сервер вернул приватный IP. Укажите публичный IP в конфиге telemt (<code className="font-mono">link_ip</code>), чтобы ссылки работали из интернета.
+                    <span>Обнаружен приватный IP — ссылки не будут работать из интернета. Нажмите «Обновить» в разделе Ноды, или добавьте в <code className="font-mono">config.toml</code>: <code className="font-mono">[general.links]</code> → <code className="font-mono">public_host = "ВАШ_IP"</code></span>
                   </div>
                 )}
                 {allLinks.map(([type, l], i) => (
@@ -256,7 +256,7 @@ function UserDetailModal({ api, username, onClose }) {
                 {hasPrivate && (
                   <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
                     <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
-                    Обнаружен приватный IP. Укажите <code className="font-mono">link_ip</code> в конфиге telemt для корректных ссылок.
+                    <span>Приватный IP — ссылки не работают из интернета. Нажмите «Обновить» в разделе Ноды, или в <code className="font-mono">config.toml</code> добавьте: <code className="font-mono">[general.links]</code> → <code className="font-mono">public_host = "ВАШ_IP"</code></span>
                   </div>
                 )}
                 <div className="space-y-2">

@@ -103,6 +103,75 @@ app.post('/register', parseJson, (req, res) => {
   res.json({ ok: true, node_id: id, name: entry.name })
 })
 
+// Serve the update-only script (no token needed, just updates binary and config)
+app.get('/update.sh', (req, res) => {
+  const { node_url } = req.query
+  const B = '`'
+  const lines = [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    '',
+    'GREEN="\\033[0;32m"; YELLOW="\\033[1;33m"; RED="\\033[0;31m"; NC="\\033[0m"',
+    'info()  { echo -e "${GREEN}[INFO]${NC}  $*"; }',
+    'warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }',
+    'die()   { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }',
+    '',
+    'BINARY=/usr/local/bin/telemt',
+    'CONFIG_FILE=/etc/telemt/config.toml',
+    'REPO_DIR=/opt/telemt-src',
+    '',
+    '[ -f "$BINARY" ] || die "Telemt не установлен. Используйте команду Авто-установки из панели."',
+    '',
+    '# Detect public IP',
+    `PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || ${B}hostname -I | awk '{print $1}'${B})`,
+    '[ -z "$PUBLIC_IP" ] && die "Не удалось определить публичный IP"',
+    'info "Публичный IP: $PUBLIC_IP"',
+    '',
+    '# Build latest from source',
+    'info "Обновляю исходники telemt..."',
+    `cd $REPO_DIR && git fetch origin && git reset --hard ${B}git rev-parse origin/HEAD${B}`,
+    'info "Собираю telemt (может занять несколько минут)..."',
+    'export PATH="$HOME/.cargo/bin:$PATH"',
+    'cargo build --release 2>&1 | tail -5',
+    'cp target/release/telemt "$BINARY"',
+    'info "Версия: $(telemt --version 2>/dev/null || echo unknown)"',
+    '',
+    '# Update public_host in config',
+    'if [ -f "$CONFIG_FILE" ]; then',
+    '  if grep -q "public_host" "$CONFIG_FILE"; then',
+    '    sed -i "s|public_host = .*|public_host = \\"$PUBLIC_IP\\"|" "$CONFIG_FILE"',
+    '  else',
+    '    if grep -q "\\[general.links\\]" "$CONFIG_FILE"; then',
+    '      sed -i "/\\[general.links\\]/a public_host = \\"$PUBLIC_IP\\"" "$CONFIG_FILE"',
+    '    else',
+    '      printf "\\n[general.links]\\npublic_host = \\"%s\\"\\n" "$PUBLIC_IP" >> "$CONFIG_FILE"',
+    '    fi',
+    '  fi',
+    '  info "public_host = $PUBLIC_IP записан в конфиг"',
+    'fi',
+    '',
+    '# Restart service',
+    'systemctl restart telemt',
+    'info "Ожидаю запуска..."',
+    'for i in $(seq 1 20); do',
+    '  systemctl is-active telemt -q && info "Telemt запущен!" && break',
+    '  [ "$i" -eq 20 ] && die "Telemt не запустился. Проверьте: journalctl -u telemt -n 50"',
+    '  sleep 1',
+    'done',
+    '',
+    'echo ""',
+    'echo "========================================"',
+    'echo "  Telemt обновлён и перезапущен!"',
+    'echo "========================================"',
+    'echo "  Публичный IP: $PUBLIC_IP"',
+    'echo "  Конфиг:       $CONFIG_FILE"',
+    'echo ""',
+    'systemctl status telemt --no-pager -l | head -8 || true',
+  ]
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+  res.send(lines.join('\n') + '\n')
+})
+
 // Serve the install bash script
 app.get('/setup.sh', (req, res) => {
   const { token, name, panel_url, api_port = '9091', proxy_port = '8443' } = req.query
