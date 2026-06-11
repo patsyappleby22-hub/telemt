@@ -670,8 +670,8 @@ function UnifiedUsersTab() {
 
       <div className="bg-dark-800 rounded-xl border border-dark-600 overflow-hidden">
         {loading ? (
-          <div className="p-6 space-y-2">
-            {[1,2,3,4].map(i => <div key={i} className="h-10 bg-dark-700 animate-pulse rounded" />)}
+          <div className="p-4 space-y-2">
+            {[1,2,3,4].map(i => <div key={i} className="h-14 bg-dark-700 animate-pulse rounded-lg" />)}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
@@ -679,82 +679,146 @@ function UnifiedUsersTab() {
             <p className="text-sm">{mergedUsers.length === 0 ? 'Нет пользователей' : 'Ничего не найдено'}</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-dark-600">
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Пользователь</th>
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Подписка</th>
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Прокси</th>
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Соед.</th>
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Трафик</th>
-                  <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Регистрация</th>
-                  <th className="px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(u => {
-                  const subActive = u.subscription_until && u.subscription_until > now
-                  return (
-                    <tr key={u._key} className="border-b border-dark-700 hover:bg-dark-750 transition-colors">
-                      <td className="px-4 py-3">
+          <>
+            {/* ── Desktop table (md+) ── */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-dark-600">
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Пользователь</th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Подписка</th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Прокси</th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Соед.</th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Трафик</th>
+                    <th className="text-left px-4 py-3 text-gray-400 font-medium text-xs">Регистрация</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(u => {
+                    const subActive = u.subscription_until && u.subscription_until > now
+                    return (
+                      <tr key={u._key} className="border-b border-dark-700 hover:bg-dark-750 transition-colors">
+                        <td className="px-4 py-3">
+                          {u._type === 'bot' ? (
+                            <>
+                              <div className="font-medium text-white">
+                                {u.first_name}{u.last_name ? ` ${u.last_name}` : ''}
+                              </div>
+                              {u.tg_username && <div className="text-xs text-gray-500">@{u.tg_username}</div>}
+                              <div className="text-xs text-gray-600 font-mono">ID {u.telegram_id}</div>
+                            </>
+                          ) : (
+                            <div className="font-mono text-sm text-white">{u.proxy_username}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {u._type === 'bot' ? (
+                            <div>
+                              <SubBadge active={subActive} until={u.subscription_until} />
+                              {u.subscription_until && (
+                                <div className="text-xs text-gray-500 mt-0.5">до {formatDate(u.subscription_until)}</div>
+                              )}
+                              {u.trial_used && <div className="text-xs text-gray-600 mt-0.5">тест исп.</div>}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-600">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {u.proxy_username ? (
+                            <div>
+                              {u.proxy_enabled === null ? (
+                                <span className="text-xs text-gray-600">нет на нодах</span>
+                              ) : u.proxy_enabled ? (
+                                <span className="inline-flex items-center gap-1 text-xs text-green-400">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-400" />Активен
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-red-400">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />Откл.
+                                </span>
+                              )}
+                              <div className="text-xs text-gray-600 font-mono mt-0.5 truncate max-w-[120px]">{u.proxy_username}</div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-600">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-300 text-sm">{u.current_connections}</td>
+                        <td className="px-4 py-3 text-gray-300 text-sm">{formatBytes(u.total_octets)}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{formatDate(u.created_at)}</td>
+                        <td className="px-4 py-3">
+                          <UserMenu user={u} onAction={handleAction} now={now} />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── Mobile cards (< md) ── */}
+            <div className="md:hidden divide-y divide-dark-700">
+              {filtered.map(u => {
+                const subActive = u.subscription_until && u.subscription_until > now
+                return (
+                  <div key={u._key} className="p-4">
+                    {/* Row 1: name + menu */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         {u._type === 'bot' ? (
                           <>
-                            <div className="font-medium text-white">
+                            <div className="font-medium text-white text-sm">
                               {u.first_name}{u.last_name ? ` ${u.last_name}` : ''}
                             </div>
                             {u.tg_username && <div className="text-xs text-gray-500">@{u.tg_username}</div>}
                             <div className="text-xs text-gray-600 font-mono">ID {u.telegram_id}</div>
                           </>
                         ) : (
-                          <div className="font-mono text-sm text-white">{u.proxy_username}</div>
+                          <div className="font-mono text-sm text-white break-all">{u.proxy_username}</div>
                         )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {u._type === 'bot' ? (
-                          <div>
-                            <SubBadge active={subActive} until={u.subscription_until} />
-                            {u.subscription_until && (
-                              <div className="text-xs text-gray-500 mt-0.5">до {formatDate(u.subscription_until)}</div>
-                            )}
-                            {u.trial_used && <div className="text-xs text-gray-600 mt-0.5">тест исп.</div>}
-                          </div>
+                      </div>
+                      <UserMenu user={u} onAction={handleAction} now={now} />
+                    </div>
+
+                    {/* Row 2: subscription + proxy badges */}
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                      {u._type === 'bot' && (
+                        <div className="flex items-center gap-1.5">
+                          <SubBadge active={subActive} until={u.subscription_until} />
+                          {u.subscription_until && (
+                            <span className="text-xs text-gray-500">до {formatDate(u.subscription_until)}</span>
+                          )}
+                          {u.trial_used && <span className="text-xs text-gray-600">· тест исп.</span>}
+                        </div>
+                      )}
+                      {u.proxy_username && (
+                        u.proxy_enabled === null ? (
+                          <span className="text-xs text-gray-600">нет на нодах</span>
+                        ) : u.proxy_enabled ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-green-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-400" />Прокси активен
+                          </span>
                         ) : (
-                          <span className="text-xs text-gray-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        {u.proxy_username ? (
-                          <div>
-                            {u.proxy_enabled === null ? (
-                              <span className="text-xs text-gray-600">нет на нодах</span>
-                            ) : u.proxy_enabled ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-green-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-green-400" />Активен
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs text-red-400">
-                                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />Откл.
-                              </span>
-                            )}
-                            <div className="text-xs text-gray-600 font-mono mt-0.5 truncate max-w-[120px]">{u.proxy_username}</div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-300 text-sm">{u.current_connections}</td>
-                      <td className="px-4 py-3 text-gray-300 text-sm">{formatBytes(u.total_octets)}</td>
-                      <td className="px-4 py-3 text-gray-400 text-xs">{formatDate(u.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <UserMenu user={u} onAction={handleAction} now={now} />
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                          <span className="inline-flex items-center gap-1 text-xs text-red-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />Прокси откл.
+                          </span>
+                        )
+                      )}
+                    </div>
+
+                    {/* Row 3: stats */}
+                    <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                      <span>Соед.: <span className="text-gray-300">{u.current_connections}</span></span>
+                      <span>Трафик: <span className="text-gray-300">{formatBytes(u.total_octets)}</span></span>
+                      {u.created_at && <span>Рег.: <span className="text-gray-400">{formatDate(u.created_at)}</span></span>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -1189,19 +1253,21 @@ export default function BotPage() {
         </div>
       )}
 
-      <div className="flex gap-1 bg-dark-800 border border-dark-600 rounded-xl p-1 w-fit">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            <t.icon size={14} />
-            {t.label}
-          </button>
-        ))}
+      <div className="bg-dark-800 border border-dark-600 rounded-xl p-1 overflow-x-auto">
+        <div className="flex gap-1 min-w-max sm:min-w-0">
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                tab === t.id ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <t.icon size={14} />
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div>

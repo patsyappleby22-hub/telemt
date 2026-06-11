@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, BarChart2, Shield, Radio, Server, Bot, ChevronDown, Check, Plus } from 'lucide-react'
+import { LayoutDashboard, BarChart2, Shield, Radio, Server, Bot, ChevronDown, Check, Plus, X } from 'lucide-react'
 import { useNode } from '../NodeContext'
 
 const links = [
@@ -11,7 +11,7 @@ const links = [
   { to: '/nodes', icon: Server, label: 'Ноды' },
 ]
 
-function NodePicker() {
+function NodePicker({ onClose }) {
   const { nodes, activeNode, selectNode } = useNode()
   const [open, setOpen] = useState(false)
 
@@ -49,7 +49,7 @@ function NodePicker() {
             )}
             <NavLink
               to="/nodes"
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); onClose?.() }}
               className="flex items-center gap-2 px-4 py-2.5 text-xs text-blue-400 hover:bg-dark-600 border-t border-dark-600 transition-colors"
             >
               <Plus size={12} />
@@ -62,10 +62,10 @@ function NodePicker() {
   )
 }
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   return (
-    <aside className="w-56 flex-shrink-0 bg-dark-800 border-r border-dark-600 flex flex-col">
-      <div className="p-5 border-b border-dark-600">
+    <aside className="w-56 h-full flex-shrink-0 bg-dark-800 border-r border-dark-600 flex flex-col">
+      <div className="p-5 border-b border-dark-600 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
             <Radio size={16} className="text-white" />
@@ -75,10 +75,17 @@ export default function Sidebar() {
             <div className="text-xs text-gray-500">MTProxy Panel</div>
           </div>
         </div>
+        {/* Close button — only visible on mobile */}
+        <button
+          onClick={onClose}
+          className="md:hidden p-1.5 text-gray-500 hover:text-gray-200 rounded-lg hover:bg-dark-700 transition-colors"
+        >
+          <X size={18} />
+        </button>
       </div>
 
       <div className="pt-3">
-        <NodePicker />
+        <NodePicker onClose={onClose} />
       </div>
 
       <nav className="flex-1 px-3 space-y-0.5">
@@ -86,6 +93,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 isActive
