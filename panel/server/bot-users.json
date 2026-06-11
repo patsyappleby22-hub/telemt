@@ -5,14 +5,30 @@
     "last_name": "Shadow",
     "username": "ShadowsockTM",
     "balance": 0,
-    "referral_count": 0,
+    "referral_count": 1,
     "created_at": 1781185277969,
-    "updated_at": 1781185355358,
+    "updated_at": 1781186735664,
     "proxy_username": "tg_819452459",
     "proxy_secret": "447ae3ee18d2476906b5628d18e58719",
-    "subscription_until": 1783863738680,
+    "subscription_until": 1784122938680,
     "has_access": true,
     "trial_used": true,
     "subscription_plan": "month1"
+  },
+  {
+    "telegram_id": 6014789391,
+    "first_name": "Гайрат",
+    "last_name": "",
+    "username": "gayrath02",
+    "balance": 0,
+    "referral_count": 0,
+    "created_at": 1781186735652,
+    "updated_at": 1781186753799,
+    "referred_by": 819452459,
+    "proxy_username": "tg_6014789391",
+    "proxy_secret": "781af1b60b92a72ff3a4ad353d886e80",
+    "subscription_until": 1781273152796,
+    "has_access": true,
+    "trial_used": true
   }
 ]

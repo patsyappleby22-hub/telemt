@@ -576,6 +576,18 @@ function SettingsTab() {
               className="w-full bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-white text-sm" />
           </div>
         </div>
+
+        <div>
+          <label className="text-xs text-gray-400 mb-1.5 block">Канал для обязательной подписки (username без @)</label>
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500 text-sm">@</span>
+            <input value={settings?.required_channel || ''}
+              onChange={e => setSettings({ ...settings, required_channel: e.target.value.replace('@', '') })}
+              placeholder="mychannel (оставьте пустым чтобы отключить)"
+              className="flex-1 bg-dark-700 border border-dark-500 rounded-lg px-3 py-2 text-white text-sm" />
+          </div>
+          <p className="text-xs text-gray-600 mt-1">Пользователь должен подписаться на канал перед получением тестового доступа. Бот должен быть администратором канала.</p>
+        </div>
       </div>
 
       <button onClick={save} disabled={saving} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm rounded-lg transition-colors">

@@ -80,6 +80,18 @@ async function getProxyLinks(telegramId) {
   return result?.links || []
 }
 
+// Returns true if user is subscribed (or channel not configured)
+async function isSubscribedToChannel(bot, userId, channelUsername) {
+  if (!channelUsername) return true
+  const chatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`
+  try {
+    const r = await bot.getChatMember(chatId, userId)
+    if (!r || !r.ok) return false
+    const status = r.result?.status
+    return ['member', 'administrator', 'creator'].includes(status)
+  } catch { return false }
+}
+
 function buildLinksKeyboard(links) {
   if (!links || links.length === 0) return []
   return links.map((link, i) => [{ text: `🔌 Подключить (сервер ${i + 1})`, url: link }])
@@ -257,10 +269,31 @@ async function startBot() {
       return
     }
 
-    if (data === 'trial') {
+    if (data === 'trial' || data === 'check_sub') {
       await getOrCreateUser(query.from)
       const s = await getSettings()
       const trialDays = s.trial_days || 1
+      const channel = s.required_channel || ''
+
+      // Check channel subscription if configured
+      if (channel) {
+        const subscribed = await isSubscribedToChannel(bot, userId, channel)
+        if (!subscribed) {
+          await editScreen(bot, query,
+            `📢 *Подпишитесь на канал*\n\nЧтобы получить тестовый доступ, подпишитесь на наш канал @${channel}\n\nПосле подписки нажмите кнопку «Проверить» ↓`,
+            {
+              parse_mode: 'Markdown',
+              reply_markup: { inline_keyboard: [
+                [{ text: `📢 Подписаться на @${channel}`, url: `https://t.me/${channel}` }],
+                [{ text: '✅ Проверить подписку', callback_data: 'check_sub' }],
+                [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+              ]}
+            }
+          )
+          return
+        }
+      }
+
       const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
       if (!result || result.error) {
         const errMsg = result?.error || 'Ошибка'

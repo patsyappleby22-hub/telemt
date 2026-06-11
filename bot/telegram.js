@@ -59,6 +59,10 @@ export class TelegramBot {
     return this._call('answerCallbackQuery', { callback_query_id: id, ...opts })
   }
 
+  async getChatMember(chatId, userId) {
+    return this._call('getChatMember', { chat_id: chatId, user_id: userId })
+  }
+
   async getUpdates(offset, timeout = 25) {
     return this._call('getUpdates', { offset, timeout, allowed_updates: ['message', 'callback_query'] })
   }
