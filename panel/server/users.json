@@ -1,56 +1,8 @@
 [
   {
-    "username": "5",
-    "secret": "eb8a53f33b5ac82f1d0741f1d1dcb926",
-    "enabled": true,
-    "updated_at": 1781170321384
-  },
-  {
-    "username": "6",
-    "secret": "8684ca681d0cd143634c627bf112f453",
-    "enabled": true,
-    "updated_at": 1781170492336
-  },
-  {
     "username": "7",
     "secret": "61dfbbc81a89a14891fc10f3b80d5f9e",
     "enabled": true,
     "updated_at": 1781176869246
-  },
-  {
-    "username": "44",
-    "secret": "2763e5ed286d9535974208b74c56c986",
-    "enabled": true,
-    "updated_at": 1781177815028
-  },
-  {
-    "username": "45",
-    "secret": "d3e00c95c89c9abef3c420aacc8cd884",
-    "enabled": true,
-    "updated_at": 1781178369988
-  },
-  {
-    "username": "46",
-    "secret": "860de28a3ceb75c7e34631013935dfaa",
-    "enabled": true,
-    "updated_at": 1781178401375
-  },
-  {
-    "username": "47",
-    "secret": "7599112a04168d38b4e21d63b1710bbc",
-    "enabled": true,
-    "updated_at": 1781178419440
-  },
-  {
-    "username": "48",
-    "secret": "1da81fd99e375c06c7ddac49dc32e703",
-    "enabled": true,
-    "updated_at": 1781178660789
-  },
-  {
-    "username": "67",
-    "secret": "f08264241131903c445f9b3b34ec50c4",
-    "enabled": true,
-    "updated_at": 1781178938783
   }
 ]
