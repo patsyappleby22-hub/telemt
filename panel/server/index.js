@@ -451,7 +451,7 @@ router.get('/setup.sh', (req, res) => {
     '',
     'if [ -n "$REG_TOKEN" ]; then',
     '  info "Регистрирую ноду в панели..."',
-    `  REG_RESPONSE=$(curl -fsSL --max-time 15 -X POST -H 'Content-Type: application/json' -d "{\\"token\\":\\"${REG_TOKEN}\\",\\"url\\":\\"http://\${PUBLIC_IP}:\${API_PORT}\\"}" "\${PANEL_URL}/proxy/register" 2>&1)`,
+    `  REG_RESPONSE=$(curl -fsSL --max-time 15 -X POST -H 'Content-Type: application/json' -d "{\\"token\\":\\"\${REG_TOKEN}\\",\\"url\\":\\"http://\${PUBLIC_IP}:\${API_PORT}\\"}" "\${PANEL_URL}/proxy/register" 2>&1)`,
     `  echo "$REG_RESPONSE" | grep -q '"ok":true' && info "Нода зарегистрирована!" || warn "Не удалось зарегистрироваться: $REG_RESPONSE"`,
     'fi',
     '',
