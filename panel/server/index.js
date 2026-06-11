@@ -704,6 +704,37 @@ app.post('/bot/payments', parseJson, (req, res) => {
   res.json(p)
 })
 
+// --- Fetch proxy links for a bot user from all nodes ---
+app.get('/bot/users/:telegram_id/links', async (req, res) => {
+  const telegramId = Number(req.params.telegram_id)
+  const user = getBotUser(telegramId)
+  if (!user || !user.proxy_username) return res.json({ links: [] })
+
+  const username = user.proxy_username
+  const currentNodes = loadNodes()
+  const allLinks = []
+
+  for (const node of currentNodes) {
+    const r = await nodeApiRequest(node, 'GET', `/v1/users/${encodeURIComponent(username)}`, null)
+    if (!r.ok) continue
+    try {
+      const data = JSON.parse(r.body)
+      const links = data?.data?.user?.links ?? data?.data?.links ?? data?.links ?? {}
+      const tls = (links.tls || []).filter(Boolean)
+      const secure = (links.secure || []).filter(Boolean)
+      const classic = (links.classic || []).filter(Boolean)
+      const nodeLinks = [...tls, ...secure, ...classic]
+      if (nodeLinks.length > 0) {
+        allLinks.push(...nodeLinks)
+      }
+    } catch {}
+  }
+
+  // Deduplicate
+  const unique = [...new Set(allLinks)]
+  res.json({ links: unique, username })
+})
+
 // --- Bot stats summary ---
 app.get('/bot/stats', (req, res) => {
   const users = loadBotUsers()

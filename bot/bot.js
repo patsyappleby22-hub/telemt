@@ -73,6 +73,20 @@ async function getOrCreateUser(from) {
   return user || {}
 }
 
+// Fetch ready-to-use proxy links from all nodes for a user
+async function getProxyLinks(telegramId) {
+  const result = await api(`/users/${telegramId}/links`)
+  return result?.links || []
+}
+
+// Format proxy links for Telegram message
+function formatLinksText(links) {
+  if (!links || links.length === 0) return ''
+  const lines = links.map(l => `\`${l}\``)
+  return '\n\n🔗 *Ссылки для подключения:*\n' + lines.join('\n\n') +
+    '\n\n_Нажмите на ссылку → она откроется в Telegram как прокси_'
+}
+
 async function handleReferral(userId, referrerId) {
   if (!referrerId || referrerId === userId) return
   const refUser = await api(`/users/${referrerId}`)
@@ -172,6 +186,7 @@ async function startBot() {
     await getOrCreateUser(msg.from)
     const s = await getSettings()
     const trialDays = s.trial_days || 1
+
     const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
     if (!result || result.error) {
       const errMsg = result?.error || 'Ошибка'
@@ -183,18 +198,24 @@ async function startBot() {
       }
       return bot.sendMessage(msg.chat.id, `❌ Ошибка: ${errMsg}`)
     }
-    let linkText = result.proxy_secret ? `\n\n🔑 Секрет: \`${result.proxy_secret}\`` : ''
+
+    // Fetch proxy links from nodes
+    const links = await getProxyLinks(userId)
+    const linksText = formatLinksText(links)
+
     await bot.sendMessage(msg.chat.id,
-      `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*${linkText}\n\nИспользуйте секрет для подключения в настройках Telegram.`,
+      `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*${linksText}`,
       { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard() }
     )
   })
 
   // Мой доступ
   bot.onText(/🔐 Мой доступ/, async (msg) => {
+    const userId = msg.from.id
     const user = await getOrCreateUser(msg.from)
     const now = Date.now()
     const active = user.subscription_until && user.subscription_until > now
+
     if (!active) {
       return bot.sendMessage(msg.chat.id,
         '❌ *У вас нет активного доступа*\n\nОформите подписку или активируйте тестовый период.',
@@ -206,10 +227,16 @@ async function startBot() {
         }
       )
     }
+
     const until = new Date(user.subscription_until).toLocaleDateString('ru-RU')
     const daysLeft = Math.ceil((user.subscription_until - now) / 86400000)
-    let text = `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*`
-    if (user.proxy_secret) text += `\n\n🔑 Секрет: \`${user.proxy_secret}\``
+
+    // Fetch fresh proxy links from all nodes
+    const links = await getProxyLinks(userId)
+    const linksText = formatLinksText(links)
+
+    let text = `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*${linksText}`
+
     await bot.sendMessage(msg.chat.id, text, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: [
@@ -320,9 +347,10 @@ async function startBot() {
         }
         return
       }
-      let linkText = result.proxy_secret ? `\n\n🔑 Секрет: \`${result.proxy_secret}\`` : ''
+      const links = await getProxyLinks(userId)
+      const linksText = formatLinksText(links)
       await bot.sendMessage(msg.chat.id,
-        `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.${linkText}`,
+        `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.${linksText}`,
         { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard() }
       )
       return
