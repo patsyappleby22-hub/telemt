@@ -12,12 +12,5 @@
     "url": "http://74.220.31.32:9091",
     "auth_token": null,
     "created_at": 1781180967723
-  },
-  {
-    "id": "f32bb089-9e50-4935-9e2b-db2d796e58bc",
-    "name": "3",
-    "url": "http://172.188.112.115:9091",
-    "auth_token": null,
-    "created_at": 1781182274900
   }
 ]
