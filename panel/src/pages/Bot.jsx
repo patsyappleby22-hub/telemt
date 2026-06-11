@@ -189,7 +189,7 @@ function PlansTab() {
         </table>
       </div>
 
-      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Новый тариф">
+      {addOpen && <Modal onClose={() => setAddOpen(false)} title="Новый тариф">
         <div className="space-y-3">
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Название</label>
@@ -218,7 +218,7 @@ function PlansTab() {
             </button>
           </div>
         </div>
-      </Modal>
+      </Modal>}
     </div>
   )
 }
@@ -370,7 +370,7 @@ function BotUsersTab() {
         </div>
       )}
 
-      <Modal isOpen={!!selectedUser} onClose={() => setSelectedUser(null)} title="Активировать подписку">
+      {!!selectedUser && <Modal onClose={() => setSelectedUser(null)} title="Активировать подписку">
         {selectedUser && (
           <div className="space-y-4">
             <div className="bg-dark-700 rounded-lg px-4 py-3 text-sm">
@@ -406,7 +406,7 @@ function BotUsersTab() {
             </div>
           </div>
         )}
-      </Modal>
+      </Modal>}
     </div>
   )
 }

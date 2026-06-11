@@ -1,0 +1,44 @@
+[
+  {
+    "id": "day1",
+    "label": "1 день",
+    "days": 1,
+    "price": 15,
+    "enabled": true
+  },
+  {
+    "id": "month1",
+    "label": "1 месяц",
+    "days": 30,
+    "price": 149,
+    "enabled": true
+  },
+  {
+    "id": "month3",
+    "label": "3 месяца",
+    "days": 90,
+    "price": 379,
+    "enabled": true
+  },
+  {
+    "id": "month6",
+    "label": "6 месяцев",
+    "days": 180,
+    "price": 699,
+    "enabled": true
+  },
+  {
+    "id": "month12",
+    "label": "12 месяцев",
+    "days": 365,
+    "price": 1290,
+    "enabled": true
+  },
+  {
+    "id": "plan_1781185030093",
+    "label": "1 месяц",
+    "days": 30,
+    "price": 99,
+    "enabled": true
+  }
+]
