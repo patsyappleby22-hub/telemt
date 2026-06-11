@@ -218,10 +218,6 @@ async function startBot() {
     }
     const s = await getSettings()
     const text = await buildMainMenuText(s)
-    // Remove any old reply keyboard, send single inline message
-    await bot.sendMessage(msg.chat.id, '⠀', {
-      reply_markup: { remove_keyboard: true }
-    }).catch(() => {})
     const r = await bot.sendMessage(msg.chat.id, text, {
       parse_mode: 'Markdown',
       reply_markup: mainMenuInlineKeyboard()
