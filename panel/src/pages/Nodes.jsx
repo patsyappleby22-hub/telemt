@@ -397,12 +397,34 @@ export default function Nodes() {
   const [modal, setModal] = useState(null)
   const toast = useToast()
 
+  const autoSync = async () => {
+    try {
+      const r = await fetch('/proxy/sync', { method: 'POST' })
+      const d = await r.json()
+      if (d.ok) {
+        const total = d.results?.reduce((s, n) => s + n.rotated + n.recreated + n.created, 0) ?? 0
+        const failed = d.results?.reduce((s, n) => s + n.failed, 0) ?? 0
+        if (failed > 0) {
+          toast(`Авто-синхронизация: ${total} применено, ${failed} ошибок`, 'error')
+        } else {
+          toast(`Авто-синхронизация: ${total} пользователей синхронизировано`, 'success')
+        }
+      }
+    } catch {}
+  }
+
+  const handleNodeAdded = async () => {
+    await refresh()
+    await autoSync()
+  }
+
   const handleDelete = async (node) => {
     if (!confirm(`Удалить ноду "${node.name}"?`)) return
     try {
       await deleteNode(node.id)
       toast(`Нода "${node.name}" удалена`, 'success')
-      refresh()
+      await refresh()
+      await autoSync()
     } catch (e) { toast('Ошибка: ' + e.message, 'error') }
   }
 
@@ -496,8 +518,8 @@ export default function Nodes() {
         </div>
       )}
 
-      {modal === 'auto' && <AutoInstallModal onClose={() => setModal(null)} onAdded={refresh} />}
-      {modal === 'manual' && <AddNodeModal onClose={() => setModal(null)} onAdded={refresh} />}
+      {modal === 'auto' && <AutoInstallModal onClose={() => setModal(null)} onAdded={handleNodeAdded} />}
+      {modal === 'manual' && <AddNodeModal onClose={() => setModal(null)} onAdded={handleNodeAdded} />}
       {modal?.type === 'edit' && <EditNodeModal node={modal.node} onClose={() => setModal(null)} onUpdated={refresh} />}
       {modal?.type === 'update' && <UpdateModal node={modal.node} onClose={() => setModal(null)} />}
     </div>
