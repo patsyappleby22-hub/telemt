@@ -6,8 +6,26 @@ async function request(method, path, body) {
     headers: { 'Content-Type': 'application/json' }
   }
   if (body !== undefined) opts.body = JSON.stringify(body)
-  const res = await fetch(BASE + path, opts)
-  const data = await res.json()
+
+  let res
+  try {
+    res = await fetch(BASE + path, opts)
+  } catch {
+    throw new Error('Сервер недоступен')
+  }
+
+  if (res.status === 502 || res.status === 503 || res.status === 504) {
+    throw new Error('Сервер telemt не запущен')
+  }
+
+  let data
+  try {
+    data = await res.json()
+  } catch {
+    if (!res.ok) throw new Error(`Сервер недоступен (HTTP ${res.status})`)
+    throw new Error('Некорректный ответ от сервера')
+  }
+
   if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`)
   return data
 }

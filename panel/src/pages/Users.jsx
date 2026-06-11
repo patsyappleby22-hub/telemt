@@ -489,7 +489,7 @@ export default function Users() {
       const res = await api.statsUsers()
       setUsers(res.data?.users || [])
     } catch (e) {
-      toast('Ошибка загрузки пользователей: ' + e.message, 'error')
+      if (showRefresh) toast('Ошибка загрузки: ' + e.message, 'error')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -497,6 +497,10 @@ export default function Users() {
   }, [toast])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    const timer = setInterval(() => load(false), 15000)
+    return () => clearInterval(timer)
+  }, [load])
 
   const handleAction = async (action, user) => {
     if (action === 'view') {
