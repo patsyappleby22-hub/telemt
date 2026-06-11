@@ -8,10 +8,10 @@ export default defineConfig({
     port: 5000,
     allowedHosts: true,
     proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:9091',
+      '/proxy': {
+        target: 'http://127.0.0.1:9092',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: (path) => path.replace(/^\/proxy/, '')
       }
     }
   }

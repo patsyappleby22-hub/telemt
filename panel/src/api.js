@@ -1,6 +1,10 @@
-const BASE = '/api'
+const PROXY = '/proxy'
 
-async function request(method, path, body) {
+function nodeBase(nodeId) {
+  return `${PROXY}/nodes/${nodeId}/api`
+}
+
+async function request(nodeId, method, path, body) {
   const opts = {
     method,
     headers: { 'Content-Type': 'application/json' }
@@ -9,51 +13,53 @@ async function request(method, path, body) {
 
   let res
   try {
-    res = await fetch(BASE + path, opts)
+    res = await fetch(nodeBase(nodeId) + path, opts)
   } catch {
-    throw new Error('Сервер недоступен')
+    throw new Error('Нет соединения с прокси-сервером')
   }
 
   if (res.status === 502 || res.status === 503 || res.status === 504) {
-    throw new Error('Сервер telemt не запущен')
+    throw new Error('Нода недоступна')
   }
 
   let data
   try {
     data = await res.json()
   } catch {
-    if (!res.ok) throw new Error(`Сервер недоступен (HTTP ${res.status})`)
-    throw new Error('Некорректный ответ от сервера')
+    if (!res.ok) throw new Error(`Нода недоступна (HTTP ${res.status})`)
+    throw new Error('Некорректный ответ от ноды')
   }
 
   if (!res.ok) throw new Error(data?.error?.message || `HTTP ${res.status}`)
   return data
 }
 
-export const api = {
-  health: () => request('GET', '/v1/health'),
-  healthReady: () => request('GET', '/v1/health/ready'),
-  systemInfo: () => request('GET', '/v1/system/info'),
-  statsSummary: () => request('GET', '/v1/stats/summary'),
-  statsUpstreams: () => request('GET', '/v1/stats/upstreams'),
-  statsUsers: () => request('GET', '/v1/stats/users'),
-  statsUsersQuota: () => request('GET', '/v1/stats/users/quota'),
-  statsUsersActiveIps: () => request('GET', '/v1/stats/users/active-ips'),
-  statsZeroAll: () => request('GET', '/v1/stats/zero/all'),
-  statsMinimalAll: () => request('GET', '/v1/stats/minimal/all'),
-  runtimeGates: () => request('GET', '/v1/runtime/gates'),
-  limitsEffective: () => request('GET', '/v1/limits/effective'),
-  securityPosture: () => request('GET', '/v1/security/posture'),
-  securityWhitelist: () => request('GET', '/v1/security/whitelist'),
-
-  getUser: (username) => request('GET', `/v1/users/${encodeURIComponent(username)}`),
-  createUser: (data) => request('POST', '/v1/users', data),
-  patchUser: (username, data) => request('PATCH', `/v1/users/${encodeURIComponent(username)}`, data),
-  deleteUser: (username) => request('DELETE', `/v1/users/${encodeURIComponent(username)}`),
-  enableUser: (username) => request('POST', `/v1/users/${encodeURIComponent(username)}/enable`),
-  disableUser: (username) => request('POST', `/v1/users/${encodeURIComponent(username)}/disable`),
-  resetQuota: (username) => request('POST', `/v1/users/${encodeURIComponent(username)}/reset-quota`),
-  rotateSecret: (username, secret) => request('POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, secret ? { secret } : {}),
+export function makeApi(nodeId) {
+  const r = (method, path, body) => request(nodeId, method, path, body)
+  return {
+    health: () => r('GET', '/v1/health'),
+    healthReady: () => r('GET', '/v1/health/ready'),
+    systemInfo: () => r('GET', '/v1/system/info'),
+    statsSummary: () => r('GET', '/v1/stats/summary'),
+    statsUpstreams: () => r('GET', '/v1/stats/upstreams'),
+    statsUsers: () => r('GET', '/v1/stats/users'),
+    statsUsersQuota: () => r('GET', '/v1/stats/users/quota'),
+    statsUsersActiveIps: () => r('GET', '/v1/stats/users/active-ips'),
+    statsZeroAll: () => r('GET', '/v1/stats/zero/all'),
+    statsMinimalAll: () => r('GET', '/v1/stats/minimal/all'),
+    runtimeGates: () => r('GET', '/v1/runtime/gates'),
+    limitsEffective: () => r('GET', '/v1/limits/effective'),
+    securityPosture: () => r('GET', '/v1/security/posture'),
+    securityWhitelist: () => r('GET', '/v1/security/whitelist'),
+    getUser: (username) => r('GET', `/v1/users/${encodeURIComponent(username)}`),
+    createUser: (data) => r('POST', '/v1/users', data),
+    patchUser: (username, data) => r('PATCH', `/v1/users/${encodeURIComponent(username)}`, data),
+    deleteUser: (username) => r('DELETE', `/v1/users/${encodeURIComponent(username)}`),
+    enableUser: (username) => r('POST', `/v1/users/${encodeURIComponent(username)}/enable`),
+    disableUser: (username) => r('POST', `/v1/users/${encodeURIComponent(username)}/disable`),
+    resetQuota: (username) => r('POST', `/v1/users/${encodeURIComponent(username)}/reset-quota`),
+    rotateSecret: (username, secret) => r('POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, secret ? { secret } : {}),
+  }
 }
 
 export function formatBytes(bytes) {
@@ -65,7 +71,7 @@ export function formatBytes(bytes) {
 }
 
 export function formatUptime(secs) {
-  if (!secs) return '0s'
+  if (!secs) return '0с'
   const d = Math.floor(secs / 86400)
   const h = Math.floor((secs % 86400) / 3600)
   const m = Math.floor((secs % 3600) / 60)

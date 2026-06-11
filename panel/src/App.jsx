@@ -5,20 +5,25 @@ import Dashboard from './pages/Dashboard'
 import Users from './pages/Users'
 import Stats from './pages/Stats'
 import Security from './pages/Security'
+import Nodes from './pages/Nodes'
 import { ToastProvider } from './components/Toast'
+import { NodeProvider } from './NodeContext'
 
 export default function App() {
   return (
     <ToastProvider>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="users" element={<Users />} />
-          <Route path="stats" element={<Stats />} />
-          <Route path="security" element={<Security />} />
-        </Route>
-      </Routes>
+      <NodeProvider>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard />} />
+            <Route path="users" element={<Users />} />
+            <Route path="stats" element={<Stats />} />
+            <Route path="security" element={<Security />} />
+            <Route path="nodes" element={<Nodes />} />
+          </Route>
+        </Routes>
+      </NodeProvider>
     </ToastProvider>
   )
 }
