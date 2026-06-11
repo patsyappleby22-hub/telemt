@@ -8,6 +8,7 @@ import crypto from 'crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const NODES_FILE = join(__dirname, 'nodes.json')
+const USERS_FILE = join(__dirname, 'users.json')
 
 const app = express()
 
@@ -18,6 +19,66 @@ function loadNodes() {
 
 function saveNodes(nodes) {
   writeFileSync(NODES_FILE, JSON.stringify(nodes, null, 2))
+}
+
+function loadUsers() {
+  if (!existsSync(USERS_FILE)) return []
+  try { return JSON.parse(readFileSync(USERS_FILE, 'utf8')) } catch { return [] }
+}
+
+function saveUsers(users) {
+  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2))
+}
+
+function nodeApiRequest(node, method, path, body) {
+  return new Promise((resolve) => {
+    let targetUrl
+    try { targetUrl = new URL(node.url) } catch { return resolve({ ok: false }) }
+
+    const isHttps = targetUrl.protocol === 'https:'
+    const transport = isHttps ? httpsRequest : httpRequest
+    const bodyStr = body ? JSON.stringify(body) : undefined
+
+    const options = {
+      hostname: targetUrl.hostname,
+      port: targetUrl.port || (isHttps ? 443 : 80),
+      path,
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000,
+    }
+    if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr)
+    if (node.auth_token) options.headers['Authorization'] = node.auth_token
+
+    const req = transport(options, (res) => {
+      let data = ''
+      res.on('data', d => { data += d })
+      res.on('end', () => resolve({ ok: res.statusCode < 300, status: res.statusCode, body: data }))
+    })
+    req.on('error', () => resolve({ ok: false }))
+    req.on('timeout', () => { req.destroy(); resolve({ ok: false }) })
+    if (bodyStr) req.write(bodyStr)
+    req.end()
+  })
+}
+
+async function syncUsersToNode(node) {
+  const users = loadUsers()
+  if (users.length === 0) return
+  let ok = 0, fail = 0
+  for (const user of users) {
+    const body = { username: user.username, secret: user.secret, enabled: user.enabled !== false }
+    if (user.max_tcp_conns) body.max_tcp_conns = user.max_tcp_conns
+    if (user.data_quota_bytes) body.data_quota_bytes = user.data_quota_bytes
+    if (user.rate_limit_up_bps) body.rate_limit_up_bps = user.rate_limit_up_bps
+    if (user.rate_limit_down_bps) body.rate_limit_down_bps = user.rate_limit_down_bps
+    if (user.max_unique_ips) body.max_unique_ips = user.max_unique_ips
+    if (user.expiration_rfc3339) body.expiration_rfc3339 = user.expiration_rfc3339
+    if (user.user_ad_tag) body.user_ad_tag = user.user_ad_tag
+    const res = await nodeApiRequest(node, 'POST', '/v1/users', body)
+    res.ok ? ok++ : fail++
+  }
+  console.log(`[sync] Node "${node.name}": ${ok} pushed, ${fail} failed (${users.length} total)`)
 }
 
 let nodes = loadNodes()
@@ -40,6 +101,8 @@ app.post('/nodes', parseJson, (req, res) => {
   const node = { id, name, url: url.replace(/\/$/, ''), auth_token: auth_token || null, created_at: Date.now() }
   nodes.push(node)
   saveNodes(nodes)
+  // Auto-sync all known users to the new node (async, don't block response)
+  syncUsersToNode(node).catch(e => console.error('[sync] Error:', e.message))
   res.json({ ...node, auth_token: auth_token ? '***' : undefined })
 })
 
@@ -100,7 +163,34 @@ app.post('/register', parseJson, (req, res) => {
   nodes.push(node)
   saveNodes(nodes)
   console.log(`[register] New node: ${entry.name} @ ${url}`)
+  // Auto-sync all known users to the newly registered node
+  setTimeout(() => syncUsersToNode(node).catch(e => console.error('[sync] Error:', e.message)), 2000)
   res.json({ ok: true, node_id: id, name: entry.name })
+})
+
+// --- User registry (stores username+secret for cross-node sync) ---
+
+app.get('/users', (req, res) => {
+  const users = loadUsers()
+  // Never expose secrets over the wire
+  res.json(users.map(u => ({ username: u.username, enabled: u.enabled })))
+})
+
+app.post('/users', parseJson, (req, res) => {
+  const { username, secret, ...settings } = req.body
+  if (!username || !secret) return res.status(400).json({ error: 'username and secret required' })
+  const users = loadUsers()
+  const idx = users.findIndex(u => u.username === username)
+  const entry = { username, secret, ...settings, updated_at: Date.now() }
+  if (idx >= 0) { users[idx] = entry } else { users.push(entry) }
+  saveUsers(users)
+  res.json({ ok: true })
+})
+
+app.delete('/users/:username', (req, res) => {
+  const users = loadUsers()
+  saveUsers(users.filter(u => u.username !== req.params.username))
+  res.json({ ok: true })
 })
 
 // Serve the update-only script (no token needed, just updates binary and config)

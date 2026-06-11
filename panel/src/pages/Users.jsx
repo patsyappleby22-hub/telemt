@@ -177,6 +177,12 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
 
     const successCount = nodeResults.filter(r => r.ok).length
     if (successCount > 0) {
+      // Save to panel user registry for future auto-sync on new nodes
+      await fetch('/proxy/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch(() => {})
       setResults({ secret: sharedSecret, nodes: nodeResults })
       toast(`Пользователь создан на ${successCount} из ${nodes.length} нод`, successCount === nodes.length ? 'success' : 'warning')
       onCreated()
@@ -335,7 +341,7 @@ function UserDetailModal({ nodes, activeNode, username, onClose }) {
   )
 }
 
-function RotateSecretModal({ api, username, onClose, onDone }) {
+function RotateSecretModal({ nodes, username, onClose, onDone }) {
   const [secret, setSecret] = useState('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -345,9 +351,21 @@ function RotateSecretModal({ api, username, onClose, onDone }) {
   const submit = async () => {
     setLoading(true); setError(null)
     try {
-      const res = await api.rotateSecret(username, secret || undefined)
-      setResult(res.data)
-      toast('Секрет обновлён', 'success')
+      const newSecret = secret.trim() || generateSecret()
+      // Rotate on all nodes with the same new secret
+      const settled = await Promise.allSettled(
+        nodes.map(node => makeApi(node.id).rotateSecret(username, newSecret))
+      )
+      const ok = settled.filter(r => r.status === 'fulfilled').length
+      if (ok === 0) throw new Error('Ни одна нода не ответила')
+      // Update registry
+      await fetch('/proxy/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, secret: newSecret }),
+      }).catch(() => {})
+      setResult({ secret: newSecret, ok, total: nodes.length })
+      toast(`Секрет обновлён на ${ok}/${nodes.length} нодах`, ok === nodes.length ? 'success' : 'warning')
       onDone()
     } catch (e) { setError(e.message) }
     finally { setLoading(false) }
@@ -358,10 +376,12 @@ function RotateSecretModal({ api, username, onClose, onDone }) {
       <Modal title="Секрет обновлён" onClose={onClose}>
         <div className="space-y-4">
           <div className="p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
-            <div className="text-sm font-medium text-green-300 mb-3">Новый секрет <b>{username}</b>:</div>
+            <div className="text-sm font-medium text-green-300 mb-3">
+              Новый секрет <b>{username}</b> — обновлён на {result.ok}/{result.total} нодах:
+            </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 font-mono text-sm bg-dark-900 px-3 py-2 rounded-lg text-yellow-300 border border-dark-600 break-all">{result.secret || JSON.stringify(result)}</code>
-              <CopyButton text={result.secret || ''} />
+              <code className="flex-1 font-mono text-sm bg-dark-900 px-3 py-2 rounded-lg text-yellow-300 border border-dark-600 break-all">{result.secret}</code>
+              <CopyButton text={result.secret} />
             </div>
           </div>
           <button onClick={onClose} className="btn-primary w-full justify-center">Закрыть</button>
@@ -373,6 +393,12 @@ function RotateSecretModal({ api, username, onClose, onDone }) {
   return (
     <Modal title={`Сменить секрет: ${username}`} onClose={onClose}>
       <div className="space-y-4">
+        {nodes.length > 1 && (
+          <div className="flex items-center gap-2 p-3 bg-blue-950/30 border border-blue-700/30 rounded-lg text-xs text-blue-300">
+            <Server size={13} className="flex-shrink-0" />
+            Новый секрет будет установлен на всех {nodes.length} нодах
+          </div>
+        )}
         {error && <div className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/40 rounded-lg text-sm text-red-300"><AlertTriangle size={14} /> {error}</div>}
         <div>
           <label className="block text-xs text-gray-500 mb-1.5">Новый секрет (32 hex, пусто = авто)</label>
@@ -443,31 +469,48 @@ export default function Users() {
     )
   }
 
+  const allNodes = nodes
+
+  const runOnAllNodes = (fn) => Promise.allSettled(allNodes.map(n => fn(makeApi(n.id))))
+
   const handleAction = async (action, user) => {
     if (action === 'view') { setModal({ type: 'view', username: user.username }) }
     else if (action === 'rotate') { setModal({ type: 'rotate', username: user.username }) }
     else if (action === 'delete') {
-      setModal({ type: 'confirm', title: 'Удалить пользователя?', message: `Удалить "${user.username}"? Это действие необратимо.`, danger: true,
+      setModal({ type: 'confirm', title: 'Удалить пользователя?', message: `Удалить "${user.username}" со всех нод? Это действие необратимо.`, danger: true,
         onConfirm: async () => {
-          try { await api.deleteUser(user.username); toast(`"${user.username}" удалён`, 'success'); setModal(null); load() }
-          catch (e) { toast('Ошибка: ' + e.message, 'error') }
+          try {
+            await runOnAllNodes(a => a.deleteUser(user.username))
+            await fetch(`/proxy/users/${encodeURIComponent(user.username)}`, { method: 'DELETE' }).catch(() => {})
+            toast(`"${user.username}" удалён со всех нод`, 'success')
+            setModal(null); load()
+          } catch (e) { toast('Ошибка: ' + e.message, 'error') }
         }
       })
     } else if (action === 'disable') {
-      setModal({ type: 'confirm', title: 'Отключить?', message: `Отключить "${user.username}"?`, danger: false,
+      setModal({ type: 'confirm', title: 'Отключить?', message: `Отключить "${user.username}" на всех нодах?`, danger: false,
         onConfirm: async () => {
-          try { await api.disableUser(user.username); toast(`"${user.username}" отключён`, 'success'); setModal(null); load() }
-          catch (e) { toast('Ошибка: ' + e.message, 'error') }
+          try {
+            await runOnAllNodes(a => a.disableUser(user.username))
+            toast(`"${user.username}" отключён на всех нодах`, 'success')
+            setModal(null); load()
+          } catch (e) { toast('Ошибка: ' + e.message, 'error') }
         }
       })
     } else if (action === 'enable') {
-      try { await api.enableUser(user.username); toast(`"${user.username}" активирован`, 'success'); load() }
-      catch (e) { toast('Ошибка: ' + e.message, 'error') }
+      try {
+        await runOnAllNodes(a => a.enableUser(user.username))
+        toast(`"${user.username}" активирован на всех нодах`, 'success')
+        load()
+      } catch (e) { toast('Ошибка: ' + e.message, 'error') }
     } else if (action === 'reset-quota') {
-      setModal({ type: 'confirm', title: 'Сбросить квоту?', message: `Сбросить данные для "${user.username}"?`, danger: false,
+      setModal({ type: 'confirm', title: 'Сбросить квоту?', message: `Сбросить данные для "${user.username}" на всех нодах?`, danger: false,
         onConfirm: async () => {
-          try { await api.resetQuota(user.username); toast(`Квота "${user.username}" сброшена`, 'success'); setModal(null); load() }
-          catch (e) { toast('Ошибка: ' + e.message, 'error') }
+          try {
+            await runOnAllNodes(a => a.resetQuota(user.username))
+            toast(`Квота "${user.username}" сброшена на всех нодах`, 'success')
+            setModal(null); load()
+          } catch (e) { toast('Ошибка: ' + e.message, 'error') }
         }
       })
     }
@@ -551,7 +594,7 @@ export default function Users() {
 
       {modal?.type === 'create' && <CreateUserModal nodes={nodes} onClose={() => setModal(null)} onCreated={load} />}
       {modal?.type === 'view' && <UserDetailModal nodes={nodes} activeNode={activeNode} username={modal.username} onClose={() => setModal(null)} />}
-      {modal?.type === 'rotate' && <RotateSecretModal api={api} username={modal.username} onClose={() => setModal(null)} onDone={load} />}
+      {modal?.type === 'rotate' && <RotateSecretModal nodes={nodes} username={modal.username} onClose={() => setModal(null)} onDone={load} />}
       {modal?.type === 'confirm' && <ConfirmModal title={modal.title} message={modal.message} danger={modal.danger} onConfirm={modal.onConfirm} onClose={() => setModal(null)} />}
     </div>
   )
