@@ -164,14 +164,39 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
     if (form.max_unique_ips) body.max_unique_ips = parseInt(form.max_unique_ips)
     if (form.expiration_rfc3339) body.expiration_rfc3339 = form.expiration_rfc3339
 
-    const settled = await Promise.allSettled(
-      nodes.map(node => makeApi(node.id).createUser(body).then(res => ({ node, data: res.data })))
-    )
+    // upsertUser: create, or if already exists — patch settings + rotate secret to match
+    const upsertUser = async (node) => {
+      const api = makeApi(node.id)
+      try {
+        const res = await api.createUser(body)
+        return { node, data: res.data, synced: false }
+      } catch (e) {
+        const msg = (e.message || '').toLowerCase()
+        if (msg.includes('exist') || msg.includes('conflict') || msg.includes('409') || msg.includes('422')) {
+          // User already exists — sync settings and secret
+          const patchBody = { enabled: body.enabled }
+          if (body.max_tcp_conns) patchBody.max_tcp_conns = body.max_tcp_conns
+          if (body.data_quota_bytes) patchBody.data_quota_bytes = body.data_quota_bytes
+          if (body.rate_limit_up_bps) patchBody.rate_limit_up_bps = body.rate_limit_up_bps
+          if (body.rate_limit_down_bps) patchBody.rate_limit_down_bps = body.rate_limit_down_bps
+          if (body.max_unique_ips) patchBody.max_unique_ips = body.max_unique_ips
+          if (body.expiration_rfc3339) patchBody.expiration_rfc3339 = body.expiration_rfc3339
+          await api.patchUser(body.username, patchBody).catch(() => {})
+          await api.rotateSecret(body.username, sharedSecret).catch(() => {})
+          const userRes = await api.getUser(body.username)
+          return { node, data: userRes.data, synced: true }
+        }
+        throw e
+      }
+    }
+
+    const settled = await Promise.allSettled(nodes.map(upsertUser))
 
     const nodeResults = settled.map((r, i) => ({
       node: nodes[i],
       ok: r.status === 'fulfilled',
       data: r.status === 'fulfilled' ? r.value.data : null,
+      synced: r.status === 'fulfilled' ? r.value.synced : false,
       error: r.status === 'rejected' ? r.reason?.message : null,
     }))
 
@@ -184,7 +209,7 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
         body: JSON.stringify(body),
       }).catch(() => {})
       setResults({ secret: sharedSecret, nodes: nodeResults })
-      toast(`Пользователь создан на ${successCount} из ${nodes.length} нод`, successCount === nodes.length ? 'success' : 'warning')
+      toast(`Пользователь настроен на ${successCount} из ${nodes.length} нод`, 'success')
       onCreated()
     } else {
       setError('Не удалось создать пользователя ни на одной ноде: ' + nodeResults[0]?.error)
@@ -205,16 +230,27 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
           </div>
           <div className="space-y-2">
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Прокси-ссылки по нодам</div>
-            {results.nodes.map(({ node, ok, data, error }) => (
-              ok ? (
-                <NodeLinksBlock key={node.id} nodeName={node.name} links={data?.user?.links} />
-              ) : (
+            {results.nodes.map(({ node, ok, data, synced, error }) => {
+              if (!ok) return (
                 <div key={node.id} className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/30 rounded-xl text-xs text-red-300">
                   <AlertTriangle size={12} className="flex-shrink-0" />
                   <span><b>{node.name}</b>: {error}</span>
                 </div>
               )
-            ))}
+              // Created: data = { user: { links } }; Synced: data = { links }
+              const links = data?.user?.links ?? data?.links
+              return (
+                <div key={node.id}>
+                  {synced && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 text-xs text-blue-400 mb-1">
+                      <Check size={11} className="text-blue-400" />
+                      <span>{node.name} — секрет синхронизирован</span>
+                    </div>
+                  )}
+                  <NodeLinksBlock nodeName={node.name} links={links} />
+                </div>
+              )
+            })}
           </div>
           <button onClick={onClose} className="btn-primary w-full justify-center">Закрыть</button>
         </div>
