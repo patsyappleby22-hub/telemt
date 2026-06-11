@@ -142,6 +142,10 @@ function plansKeyboard(plans) {
 // userId → { chatId, msgId }
 const lastMsg = new Map()
 
+// ─── Pending trial: users who need to subscribe before getting trial ──────────
+// userId → { chatId, msgId } — kept in memory, cleared on grant or restart
+const pendingTrial = new Map()
+
 async function showScreen(bot, chatId, userId, text, opts = {}) {
   const hasInline = !!opts.reply_markup?.inline_keyboard
   const prev = lastMsg.get(userId)
@@ -279,8 +283,8 @@ async function startBot() {
       if (channel) {
         const subscribed = await isSubscribedToChannel(bot, userId, channel)
         if (!subscribed) {
-          await editScreen(bot, query,
-            `📢 *Подпишитесь на канал*\n\nЧтобы получить тестовый доступ, подпишитесь на наш канал @${channel}\n\nПосле подписки нажмите кнопку «Проверить» ↓`,
+          const sent = await editScreen(bot, query,
+            `📢 *Подпишитесь на канал*\n\nЧтобы получить тестовый доступ, подпишитесь на наш канал @${channel}\n\nКак только подпишетесь — тест выдастся *автоматически* ✅`,
             {
               parse_mode: 'Markdown',
               reply_markup: { inline_keyboard: [
@@ -290,8 +294,14 @@ async function startBot() {
               ]}
             }
           )
+          // Remember this user is waiting for trial after subscription
+          const chatId = query.message.chat.id
+          const msgId = sent?.message_id || query.message.message_id
+          pendingTrial.set(userId, { chatId, msgId })
           return
         }
+        // Subscribed — clear from pending if present
+        pendingTrial.delete(userId)
       }
 
       const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
@@ -440,6 +450,63 @@ async function startBot() {
         }
       )
       return
+    }
+  })
+
+  // ── chat_member: auto-grant trial when user joins the required channel ────────
+  bot.on('chat_member', async (update) => {
+    try {
+      const newStatus = update.new_chat_member?.status
+      const oldStatus = update.old_chat_member?.status
+      const user = update.new_chat_member?.user
+      if (!user || user.is_bot) return
+
+      // Only react when user becomes a member (joins)
+      const joined = ['member', 'administrator', 'creator'].includes(newStatus) &&
+        !['member', 'administrator', 'creator'].includes(oldStatus)
+      if (!joined) return
+
+      const userId = user.id
+      if (!pendingTrial.has(userId)) return
+
+      const { chatId, msgId } = pendingTrial.get(userId)
+      pendingTrial.delete(userId)
+
+      const s = await getSettings()
+      const trialDays = s.trial_days || 1
+
+      const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
+      if (!result || result.error) {
+        const errMsg = result?.error || 'Ошибка'
+        const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
+        await bot.editMessageText(chatId, msgId,
+          isUsed
+            ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку:'
+            : `❌ Ошибка: ${errMsg}`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: [
+              [{ text: '💳 Купить доступ', callback_data: 'show_plans' }],
+              [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            ]}
+          }
+        )
+        return
+      }
+
+      const links = await getProxyLinks(userId)
+      const linkRows = buildLinksKeyboard(links)
+      await bot.editMessageText(chatId, msgId,
+        links.length > 0
+          ? `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения:`
+          : `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
+        }
+      )
+    } catch (e) {
+      console.error('[bot] chat_member handler error:', e.message)
     }
   })
 

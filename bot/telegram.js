@@ -8,6 +8,7 @@ export class TelegramBot {
     this.offset = 0
     this.handlers = []
     this.cbHandlers = []
+    this.chatMemberHandlers = []
     this.polling = false
   }
 
@@ -64,7 +65,7 @@ export class TelegramBot {
   }
 
   async getUpdates(offset, timeout = 25) {
-    return this._call('getUpdates', { offset, timeout, allowed_updates: ['message', 'callback_query'] })
+    return this._call('getUpdates', { offset, timeout, allowed_updates: ['message', 'callback_query', 'chat_member'] })
   }
 
   onText(regex, handler) {
@@ -73,6 +74,7 @@ export class TelegramBot {
 
   on(event, handler) {
     if (event === 'callback_query') this.cbHandlers.push(handler)
+    if (event === 'chat_member') this.chatMemberHandlers.push(handler)
   }
 
   async startPolling() {
@@ -94,6 +96,9 @@ export class TelegramBot {
               }
               if (update.callback_query) {
                 for (const h of this.cbHandlers) await h(update.callback_query)
+              }
+              if (update.chat_member) {
+                for (const h of this.chatMemberHandlers) await h(update.chat_member)
               }
             } catch (e) {
               console.error('[bot] Handler error:', e.message)
