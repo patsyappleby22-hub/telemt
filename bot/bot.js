@@ -274,42 +274,15 @@ async function startBot() {
     }
 
     if (data === 'trial' || data === 'check_sub') {
-      await getOrCreateUser(query.from)
+      const user = await getOrCreateUser(query.from)
       const s = await getSettings()
       const trialDays = s.trial_days || 1
-      const channel = s.required_channel || ''
+      const channel = (s.required_channel || '').trim().replace(/^@/, '')
 
-      // Check channel subscription if configured
-      if (channel) {
-        const subscribed = await isSubscribedToChannel(bot, userId, channel)
-        if (!subscribed) {
-          const sent = await editScreen(bot, query,
-            `📢 *Подпишитесь на канал*\n\nЧтобы получить тестовый доступ, подпишитесь на наш канал @${channel}\n\nКак только подпишетесь — тест выдастся *автоматически* ✅`,
-            {
-              parse_mode: 'Markdown',
-              reply_markup: { inline_keyboard: [
-                [{ text: `📢 Подписаться на @${channel}`, url: `https://t.me/${channel}` }],
-                [{ text: '✅ Проверить подписку', callback_data: 'check_sub' }],
-                [{ text: '↩️ Назад', callback_data: 'main_menu' }]
-              ]}
-            }
-          )
-          // Remember this user is waiting for trial after subscription
-          const chatId = query.message.chat.id
-          const msgId = sent?.message_id || query.message.message_id
-          pendingTrial.set(userId, { chatId, msgId })
-          return
-        }
-        // Subscribed — clear from pending if present
-        pendingTrial.delete(userId)
-      }
-
-      const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
-      if (!result || result.error) {
-        const errMsg = result?.error || 'Ошибка'
-        const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
+      // ── 1. Тест уже использован — сообщаем сразу, до всяких проверок ──────────
+      if (user.trial_used) {
         await editScreen(bot, query,
-          isUsed ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку:' : `❌ Ошибка: ${errMsg}`,
+          '⚠️ *Тестовый период уже использован*\n\nОформите подписку, чтобы продолжить пользоваться прокси:',
           {
             parse_mode: 'Markdown',
             reply_markup: { inline_keyboard: [
@@ -320,12 +293,56 @@ async function startBot() {
         )
         return
       }
+
+      // ── 2. Проверка подписки на канал ──────────────────────────────────────────
+      if (channel) {
+        const subscribed = await isSubscribedToChannel(bot, userId, channel)
+        if (!subscribed) {
+          // Показываем приглашение подписаться и запоминаем ожидание
+          await editScreen(bot, query,
+            `📢 *Для получения тестового доступа*\n\nПодпишитесь на наш канал — это обязательное условие.\n\nПосле подписки нажмите кнопку *«Я подписался»* — доступ выдастся автоматически 🎉\n\n⏱ Тест: ${trialDays} дн.`,
+            {
+              parse_mode: 'Markdown',
+              reply_markup: { inline_keyboard: [
+                [{ text: `🔔 Подписаться на @${channel}`, url: `https://t.me/${channel}` }],
+                [{ text: '✅ Я подписался', callback_data: 'check_sub' }],
+                [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+              ]}
+            }
+          )
+          pendingTrial.set(userId, { chatId: query.message.chat.id, msgId: query.message.message_id })
+          return
+        }
+        // Подписан — убираем из ожидания
+        pendingTrial.delete(userId)
+      }
+
+      // ── 3. Выдаём тест ─────────────────────────────────────────────────────────
+      const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
+      if (!result || result.error) {
+        const errMsg = result?.error || 'Ошибка'
+        const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
+        await editScreen(bot, query,
+          isUsed
+            ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку:'
+            : `❌ Ошибка: ${errMsg}`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: [
+              [{ text: '💳 Купить доступ', callback_data: 'show_plans' }],
+              [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+            ]}
+          }
+        )
+        return
+      }
+
       const links = await getProxyLinks(userId)
       const linkRows = buildLinksKeyboard(links)
       await editScreen(bot, query,
         links.length > 0
-          ? `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения:`
-          : `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.`,
+          ? `✅ *Тестовый доступ активирован!*\n📅 Срок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения к прокси:`
+          : `✅ *Тестовый доступ активирован!*\n📅 Срок: ${trialDays} дн.\n\n_Ссылки появятся после настройки нод._`,
         {
           parse_mode: 'Markdown',
           reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
