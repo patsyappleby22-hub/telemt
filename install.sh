@@ -11,7 +11,7 @@ if [ -z "${TLS_DOMAIN:-}" ]; then
     _tld_seed=$(od -A n -t d4 -N 4 /dev/urandom 2>/dev/null | tr -d ' \n' || printf '%s' "$$")
     TLS_DOMAIN=$(awk -v seed="$_tld_seed" 'BEGIN{
         srand(seed+0)
-        n=split("microsoft.com windowsupdate.com docker.com gps.gov apple.com amazon.com github.com cloudflare.com live.com office.com update.microsoft.com fastly.net digicert.com aka.ms cdn.cloudflare.com storage.googleapis.com s3.amazonaws.com updates.cdn-apple.com ocsp.digicert.com", a, " ")
+        n=split("microsoft.com windowsupdate.com docker.com gps.gov apple.com amazon.com github.com live.com office.com update.microsoft.com digicert.com aka.ms storage.googleapis.com s3.amazonaws.com updates.cdn-apple.com ocsp.digicert.com", a, " ")
         print a[int(rand()*n)+1]
     }')
     unset _tld_seed
