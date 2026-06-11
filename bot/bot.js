@@ -79,12 +79,15 @@ async function getProxyLinks(telegramId) {
   return result?.links || []
 }
 
-// Format proxy links for Telegram message
-function formatLinksText(links) {
-  if (!links || links.length === 0) return ''
-  const lines = links.map(l => `\`${l}\``)
-  return '\n\n🔗 *Ссылки для подключения:*\n' + lines.join('\n\n') +
-    '\n\n_Нажмите на ссылку → она откроется в Telegram как прокси_'
+// Build inline keyboard rows from proxy links (each link = button)
+function buildLinksKeyboard(links) {
+  if (!links || links.length === 0) return []
+  return links.map((link, i) => [{ text: `🔌 Подключить (сервер ${i + 1})`, url: link }])
+}
+
+// Merge link buttons with action buttons into one inline_keyboard
+function mergeKeyboard(linkRows, actionRows) {
+  return { inline_keyboard: [...linkRows, ...actionRows] }
 }
 
 async function handleReferral(userId, referrerId) {
@@ -201,12 +204,19 @@ async function startBot() {
 
     // Fetch proxy links from nodes
     const links = await getProxyLinks(userId)
-    const linksText = formatLinksText(links)
+    const linkRows = buildLinksKeyboard(links)
 
-    await bot.sendMessage(msg.chat.id,
-      `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*${linksText}`,
-      { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard() }
-    )
+    const trialText = links.length > 0
+      ? `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*\n\n🔌 Нажмите кнопку ниже, чтобы подключиться:`
+      : `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*\n\n⏳ Ноды загружаются, зайдите в «Мой доступ» через минуту.`
+
+    await bot.sendMessage(msg.chat.id, trialText, {
+      parse_mode: 'Markdown',
+      reply_markup: linkRows.length > 0
+        ? mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
+        : undefined
+    })
+    if (linkRows.length === 0) await bot.sendMessage(msg.chat.id, '🏠', { reply_markup: mainMenuKeyboard() }).catch(() => {})
   })
 
   // Мой доступ
@@ -233,16 +243,18 @@ async function startBot() {
 
     // Fetch fresh proxy links from all nodes
     const links = await getProxyLinks(userId)
-    const linksText = formatLinksText(links)
+    const linkRows = buildLinksKeyboard(links)
 
-    let text = `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*${linksText}`
+    const accessText = links.length > 0
+      ? `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*\n\n🔌 Нажмите кнопку для подключения:`
+      : `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*`
 
-    await bot.sendMessage(msg.chat.id, text, {
+    await bot.sendMessage(msg.chat.id, accessText, {
       parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [
+      reply_markup: mergeKeyboard(linkRows, [
         [{ text: '🔄 Продлить', callback_data: 'show_plans' }],
         [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-      ]}
+      ])
     })
   })
 
@@ -348,11 +360,14 @@ async function startBot() {
         return
       }
       const links = await getProxyLinks(userId)
-      const linksText = formatLinksText(links)
-      await bot.sendMessage(msg.chat.id,
-        `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.${linksText}`,
-        { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard() }
-      )
+      const linkRows = buildLinksKeyboard(links)
+      const trialCbText = links.length > 0
+        ? `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения:`
+        : `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.`
+      await bot.sendMessage(msg.chat.id, trialCbText, {
+        parse_mode: 'Markdown',
+        reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
+      })
       return
     }
 
