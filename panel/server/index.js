@@ -9,8 +9,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const NODES_FILE = join(__dirname, 'nodes.json')
 
 const app = express()
-app.use(express.json())
-app.use(express.text({ type: '*/*' }))
 
 function loadNodes() {
   if (!existsSync(NODES_FILE)) return []
@@ -26,13 +24,15 @@ let nodes = loadNodes()
 // In-memory registration tokens: { token -> { name, panel_url, expires_at } }
 const regTokens = new Map()
 
+const parseJson = express.json()
+
 // --- Node CRUD ---
 
 app.get('/nodes', (req, res) => {
   res.json(nodes.map(n => ({ ...n, auth_token: n.auth_token ? '***' : undefined })))
 })
 
-app.post('/nodes', (req, res) => {
+app.post('/nodes', parseJson, (req, res) => {
   const { name, url, auth_token } = req.body
   if (!name || !url) return res.status(400).json({ error: 'name and url required' })
   const id = crypto.randomUUID()
@@ -42,7 +42,7 @@ app.post('/nodes', (req, res) => {
   res.json({ ...node, auth_token: auth_token ? '***' : undefined })
 })
 
-app.patch('/nodes/:id', (req, res) => {
+app.patch('/nodes/:id', parseJson, (req, res) => {
   const idx = nodes.findIndex(n => n.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Not found' })
   const { name, url, auth_token } = req.body
@@ -65,7 +65,7 @@ app.delete('/nodes/:id', (req, res) => {
 // --- Auto-registration ---
 
 // Create a one-time registration token
-app.post('/tokens', (req, res) => {
+app.post('/tokens', parseJson, (req, res) => {
   const { name, panel_url } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   if (!panel_url) return res.status(400).json({ error: 'panel_url required' })
@@ -80,7 +80,7 @@ app.post('/tokens', (req, res) => {
 })
 
 // VPS calls this after installing telemt to register itself
-app.post('/register', (req, res) => {
+app.post('/register', parseJson, (req, res) => {
   const { token, url } = req.body
   if (!token) return res.status(400).json({ error: 'token required' })
   if (!url) return res.status(400).json({ error: 'url required' })
