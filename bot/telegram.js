@@ -47,6 +47,14 @@ export class TelegramBot {
     return this._call('sendMessage', { chat_id: chatId, text, ...extra })
   }
 
+  async editMessageText(chatId, messageId, text, extra = {}) {
+    return this._call('editMessageText', { chat_id: chatId, message_id: messageId, text, ...extra })
+  }
+
+  async editMessageReplyMarkup(chatId, messageId, replyMarkup) {
+    return this._call('editMessageReplyMarkup', { chat_id: chatId, message_id: messageId, reply_markup: replyMarkup })
+  }
+
   async answerCallbackQuery(id, opts = {}) {
     return this._call('answerCallbackQuery', { callback_query_id: id, ...opts })
   }
