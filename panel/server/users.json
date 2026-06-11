@@ -4,5 +4,11 @@
     "secret": "4fdb5dfc275e7d778553a2c77974118d",
     "enabled": true,
     "expiration_rfc3339": "2026-06-12T14:23:39.243Z"
+  },
+  {
+    "username": "tg_6014789391",
+    "secret": "1e864cedcf2776fef7cfd01ec19132d2",
+    "enabled": true,
+    "expiration_rfc3339": "2026-07-12T14:49:53.010Z"
   }
 ]

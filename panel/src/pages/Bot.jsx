@@ -372,19 +372,12 @@ function SyncButton({ onLoad, addToast }) {
 // ─── User Actions Menu ────────────────────────────────────────────────────────
 function UserMenu({ user, onAction, now }) {
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const [pos, setPos] = useState({ top: 0, bottom: null, right: 0 })
   const btnRef = useRef(null)
 
   const subActive = user.subscription_until && user.subscription_until > now
 
-  const toggle = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
-    }
-    setOpen(v => !v)
-  }
-
+  // Build actions list first so toggle can measure menu height
   const actions = []
   if (user._type === 'bot') {
     actions.push({ id: 'activate', label: 'Выдать подписку', icon: Check })
@@ -402,6 +395,25 @@ function UserMenu({ user, onAction, now }) {
   }
   actions.push({ id: 'delete', label: 'Удалить', icon: Trash2, danger: true })
 
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      const menuHeight = actions.length * 44 + 8
+      const spaceBelow = window.innerHeight - r.bottom
+      if (spaceBelow < menuHeight) {
+        // Not enough room below — open upward
+        setPos({ top: null, bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right })
+      } else {
+        setPos({ top: r.bottom + 4, bottom: null, right: window.innerWidth - r.right })
+      }
+    }
+    setOpen(v => !v)
+  }
+
+  const menuStyle = pos.bottom !== null
+    ? { bottom: pos.bottom, right: pos.right }
+    : { top: pos.top, right: pos.right }
+
   return (
     <div>
       <button ref={btnRef} onClick={toggle}
@@ -412,7 +424,7 @@ function UserMenu({ user, onAction, now }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="fixed z-50 w-48 bg-dark-700 border border-dark-500 rounded-xl shadow-2xl overflow-hidden"
-            style={{ top: pos.top, right: pos.right }}>
+            style={menuStyle}>
             {actions.map(({ id, label, icon: Icon, danger }) => (
               <button key={id} onClick={() => { setOpen(false); onAction(id, user) }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${
