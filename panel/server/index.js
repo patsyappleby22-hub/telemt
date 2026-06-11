@@ -680,8 +680,11 @@ router.post('/bot/users/:telegram_id/trial', async (req, res) => {
 })
 
 // ── Mount API router ───────────────────────────────────────────────────────────
+// /proxy — production browser requests (no Vite rewrite)
+// /     — dev mode (Vite strips /proxy prefix) + bot service-to-service calls
 
 app.use('/proxy', router)
+app.use('/', router)
 
 // ── Health check ───────────────────────────────────────────────────────────────
 
