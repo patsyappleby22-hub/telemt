@@ -168,9 +168,9 @@ function AutoInstallModal({ onClose, onAdded }) {
 
       {step === 2 && (
         <div className="space-y-5">
-          <div className="p-3 bg-yellow-900/20 border border-yellow-700/30 rounded-lg flex items-start gap-2 text-xs text-yellow-300">
-            <span className="flex-shrink-0 mt-0.5">⏱</span>
-            <span>Скрипт установит Rust и соберёт telemt из исходников — это займёт <b>3–8 минут</b>. Не закрывайте терминал VPS.</span>
+          <div className="p-3 bg-dark-700/60 border border-dark-500 rounded-lg space-y-1 text-xs text-gray-400">
+            <div className="flex items-center gap-2 text-gray-300 font-medium"><span>⚡</span> Если telemt уже установлен — скрипт завершится за секунды</div>
+            <div className="flex items-center gap-2 text-yellow-400"><span>⏱</span> Если VPS новый — скрипт соберёт из исходников (3–8 мин, только 1 раз)</div>
           </div>
 
           <div className="p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
