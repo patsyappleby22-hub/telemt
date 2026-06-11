@@ -1,5 +1,6 @@
 import express from 'express'
-import { createProxyMiddleware } from 'http-proxy-middleware'
+import { request as httpRequest } from 'http'
+import { request as httpsRequest } from 'https'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
@@ -310,26 +311,47 @@ app.get('/setup.sh', (req, res) => {
 
 // --- Proxy to remote telemt nodes ---
 
-app.use('/nodes/:id/api', (req, res, next) => {
+app.use('/nodes/:id/api', (req, res) => {
   const node = nodes.find(n => n.id === req.params.id)
   if (!node) return res.status(404).json({ error: 'Node not found' })
 
-  const proxy = createProxyMiddleware({
-    target: node.url,
-    changeOrigin: true,
-    pathRewrite: (path) => path.replace(`/nodes/${req.params.id}/api`, ''),
-    on: {
-      proxyReq: (proxyReq) => {
-        if (node.auth_token) {
-          proxyReq.setHeader('Authorization', node.auth_token)
-        }
-      },
-      error: (err, req, res) => {
-        res.status(502).json({ ok: false, error: { message: 'Node unreachable: ' + err.message } })
-      }
+  let targetUrl
+  try {
+    targetUrl = new URL(node.url)
+  } catch {
+    return res.status(500).json({ error: 'Invalid node URL' })
+  }
+
+  const apiPath = req.url
+  const isHttps = targetUrl.protocol === 'https:'
+  const transport = isHttps ? httpsRequest : httpRequest
+
+  const options = {
+    hostname: targetUrl.hostname,
+    port: targetUrl.port || (isHttps ? 443 : 80),
+    path: apiPath,
+    method: req.method,
+    headers: { ...req.headers, host: targetUrl.host }
+  }
+
+  if (node.auth_token) {
+    options.headers['Authorization'] = node.auth_token
+  }
+
+  delete options.headers['content-length']
+
+  const proxyReq = transport(options, (proxyRes) => {
+    res.writeHead(proxyRes.statusCode, proxyRes.headers)
+    proxyRes.pipe(res)
+  })
+
+  proxyReq.on('error', (err) => {
+    if (!res.headersSent) {
+      res.status(502).json({ ok: false, error: { message: 'Node unreachable: ' + err.message } })
     }
   })
-  proxy(req, res, next)
+
+  req.pipe(proxyReq)
 })
 
 const PORT = 9092
