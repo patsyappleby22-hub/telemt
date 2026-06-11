@@ -113,178 +113,184 @@ app.get('/setup.sh', (req, res) => {
   const safePanel = panel_url.replace(/'/g, '')
   const safeToken = token.replace(/[^a-f0-9]/g, '')
 
-  const script = `#!/bin/bash
-set -euo pipefail
-
-# ======================================================
-#  Telemt Auto-Install Script
-#  Панель: ${safePanel}
-#  Нода:   ${safeName}
-# ======================================================
-
-PANEL_URL='${safePanel}'
-REG_TOKEN='${safeToken}'
-NODE_NAME='${safeName}'
-API_PORT='${api_port}'
-PROXY_PORT='${proxy_port}'
-INSTALL_DIR='/opt/telemt'
-CONFIG_FILE="$INSTALL_DIR/config.toml"
-SERVICE_FILE='/etc/systemd/system/telemt.service'
-
-RED='\\033[0;31m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'; NC='\\033[0m'
-info()    { echo -e "\\n${GREEN}[✓]${NC} $*"; }
-warn()    { echo -e "\\n${YELLOW}[!]${NC} $*"; }
-die()     { echo -e "\\n${RED}[✗]${NC} $*"; exit 1; }
-
-[ "$(id -u)" -ne 0 ] && die "Запускайте скрипт от root: sudo bash setup.sh"
-
-# --- Detect public IP ---
-info "Определяю публичный IP..."
-PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || \\
-            curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || \\
-            hostname -I | awk '{print $1}')
-[ -z "$PUBLIC_IP" ] && die "Не удалось определить публичный IP"
-info "Публичный IP: $PUBLIC_IP"
-
-# --- Install dependencies ---
-info "Устанавливаю зависимости..."
-if command -v apt-get &>/dev/null; then
-  apt-get update -qq
-  apt-get install -y -qq curl wget openssl ca-certificates
-elif command -v yum &>/dev/null; then
-  yum install -y -q curl wget openssl ca-certificates
-fi
-
-# --- Create install directory ---
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-
-# --- Download telemt binary ---
-info "Скачиваю telemt..."
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  ARCH_TAG="x86_64-unknown-linux-musl" ;;
-  aarch64) ARCH_TAG="aarch64-unknown-linux-musl" ;;
-  *)       die "Неподдерживаемая архитектура: $ARCH" ;;
-esac
-
-RELEASE_URL="https://github.com/telemt/telemt/releases/latest/download/telemt-$ARCH_TAG"
-if wget -q --timeout=30 -O telemt.tmp "$RELEASE_URL" 2>/dev/null; then
-  mv telemt.tmp telemt
-  chmod +x telemt
-  info "Бинарник скачан"
-elif [ -f telemt ]; then
-  warn "Не удалось скачать — использую имеющийся бинарник"
-else
-  die "Бинарник telemt не найден. Скопируйте его в $INSTALL_DIR/telemt вручную и перезапустите скрипт."
-fi
-
-# --- Generate secrets ---
-SECRET=$(openssl rand -hex 16)
-info "Сгенерирован секрет прокси: $SECRET"
-
-# --- Write config ---
-info "Создаю конфиг..."
-cat > "$CONFIG_FILE" << TOML
-[server]
-listen = "0.0.0.0:$PROXY_PORT"
-workers = 0
-
-[server.api]
-listen = "0.0.0.0:$API_PORT"
-whitelist = ["0.0.0.0/0"]
-
-[[users]]
-username = "default"
-secret = "$SECRET"
-enabled = true
-TOML
-
-# --- Systemd service ---
-info "Настраиваю systemd сервис..."
-cat > "$SERVICE_FILE" << UNIT
-[Unit]
-Description=Telemt MTProxy Server
-After=network.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=$INSTALL_DIR
-ExecStart=$INSTALL_DIR/telemt $CONFIG_FILE
-Restart=always
-RestartSec=5
-LimitNOFILE=65536
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-# --- Firewall ---
-if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
-  info "Открываю порты в UFW..."
-  ufw allow "$API_PORT/tcp"   >/dev/null 2>&1 || true
-  ufw allow "$PROXY_PORT/tcp" >/dev/null 2>&1 || true
-fi
-if command -v firewall-cmd &>/dev/null; then
-  info "Открываю порты в firewalld..."
-  firewall-cmd --permanent --add-port="$API_PORT/tcp"   >/dev/null 2>&1 || true
-  firewall-cmd --permanent --add-port="$PROXY_PORT/tcp" >/dev/null 2>&1 || true
-  firewall-cmd --reload >/dev/null 2>&1 || true
-fi
-
-# --- Start service ---
-info "Запускаю telemt..."
-systemctl daemon-reload
-systemctl enable telemt >/dev/null 2>&1
-systemctl restart telemt
-
-# Wait for API to become available
-for i in $(seq 1 15); do
-  if curl -fsSL --max-time 2 "http://127.0.0.1:$API_PORT/v1/health" >/dev/null 2>&1; then
-    info "API доступен"
-    break
-  fi
-  [ "$i" -eq 15 ] && die "Telemt не запустился за 15 секунд. Проверьте: journalctl -u telemt -n 50"
-  sleep 1
-done
-
-# --- Register with panel ---
-info "Регистрирую ноду в панели..."
-REG_RESPONSE=$(curl -fsSL --max-time 10 \\
-  -X POST \\
-  -H 'Content-Type: application/json' \\
-  -d "{\\"token\\":\\"$REG_TOKEN\\",\\"url\\":\\"http://$PUBLIC_IP:$API_PORT\\"}" \\
-  "$PANEL_URL/proxy/register" 2>&1)
-
-if echo "$REG_RESPONSE" | grep -q '"ok":true'; then
-  info "Нода успешно зарегистрирована в панели!"
-else
-  warn "Не удалось зарегистрироваться автоматически. Ответ: $REG_RESPONSE"
-  warn "Добавьте ноду вручную: http://$PUBLIC_IP:$API_PORT"
-fi
-
-# --- Summary ---
-echo ""
-echo -e "${GREEN}╔══════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║   Telemt установлен и запущен!           ║${NC}"
-echo -e "${GREEN}╚══════════════════════════════════════════╝${NC}"
-echo ""
-echo "  Нода:       $NODE_NAME"
-echo "  Публичный IP: $PUBLIC_IP"
-echo "  API порт:   $API_PORT"
-echo "  Proxy порт: $PROXY_PORT"
-echo "  Секрет:     $SECRET"
-echo "  Конфиг:     $CONFIG_FILE"
-echo ""
-echo "  Статус сервиса:"
-systemctl status telemt --no-pager -l | head -8 || true
-echo ""
-`
+  // Build the script using string array to avoid JS template literal
+  // interpolating bash variables like ${GREEN}, ${PUBLIC_IP}, etc.
+  const B = '`'  // backtick helper to avoid nesting issues
+  const lines = [
+    '#!/bin/bash',
+    'set -euo pipefail',
+    '',
+    '# ======================================================',
+    `#  Telemt Auto-Install Script`,
+    `#  Панель: ${safePanel}`,
+    `#  Нода:   ${safeName}`,
+    '# ======================================================',
+    '',
+    `PANEL_URL='${safePanel}'`,
+    `REG_TOKEN='${safeToken}'`,
+    `NODE_NAME='${safeName}'`,
+    `API_PORT='${api_port}'`,
+    `PROXY_PORT='${proxy_port}'`,
+    "INSTALL_DIR='/opt/telemt'",
+    'CONFIG_FILE="$INSTALL_DIR/config.toml"',
+    'SERVICE_FILE=\'/etc/systemd/system/telemt.service\'',
+    '',
+    "RED='\\033[0;31m'; GREEN='\\033[0;32m'; YELLOW='\\033[1;33m'; NC='\\033[0m'",
+    'info()    { echo -e "\\n${GREEN}[+]${NC} $*"; }',
+    'warn()    { echo -e "\\n${YELLOW}[!]${NC} $*"; }',
+    'die()     { echo -e "\\n${RED}[x]${NC} $*"; exit 1; }',
+    '',
+    '[ "$(id -u)" -ne 0 ] && die "Запускайте скрипт от root: sudo bash setup.sh"',
+    '',
+    '# --- Detect public IP ---',
+    'info "Определяю публичный IP..."',
+    'PUBLIC_IP=$(curl -fsSL --max-time 5 https://api.ipify.org 2>/dev/null || \\',
+    '            curl -fsSL --max-time 5 https://ifconfig.me 2>/dev/null || \\',
+    "            hostname -I | awk '{print $1}')",
+    '[ -z "$PUBLIC_IP" ] && die "Не удалось определить публичный IP"',
+    'info "Публичный IP: $PUBLIC_IP"',
+    '',
+    '# --- Install dependencies ---',
+    'info "Устанавливаю зависимости..."',
+    'if command -v apt-get &>/dev/null; then',
+    '  apt-get update -qq',
+    '  apt-get install -y -qq curl wget openssl ca-certificates',
+    'elif command -v yum &>/dev/null; then',
+    '  yum install -y -q curl wget openssl ca-certificates',
+    'fi',
+    '',
+    '# --- Create install directory ---',
+    'mkdir -p "$INSTALL_DIR"',
+    'cd "$INSTALL_DIR"',
+    '',
+    '# --- Download telemt binary ---',
+    'info "Скачиваю telemt..."',
+    'ARCH=$(uname -m)',
+    'case "$ARCH" in',
+    '  x86_64)  ARCH_TAG="x86_64-unknown-linux-musl" ;;',
+    '  aarch64) ARCH_TAG="aarch64-unknown-linux-musl" ;;',
+    '  *)       die "Неподдерживаемая архитектура: $ARCH" ;;',
+    'esac',
+    '',
+    'RELEASE_URL="https://github.com/telemt/telemt/releases/latest/download/telemt-${ARCH_TAG}"',
+    'if wget -q --timeout=30 -O telemt.tmp "$RELEASE_URL" 2>/dev/null; then',
+    '  mv telemt.tmp telemt',
+    '  chmod +x telemt',
+    '  info "Бинарник скачан"',
+    'elif [ -f telemt ]; then',
+    '  warn "Не удалось скачать — использую имеющийся бинарник"',
+    'else',
+    '  die "Бинарник telemt не найден. Скопируйте его в $INSTALL_DIR/telemt вручную."',
+    'fi',
+    '',
+    '# --- Generate secret ---',
+    'SECRET=$(openssl rand -hex 16)',
+    'info "Сгенерирован секрет прокси: $SECRET"',
+    '',
+    '# --- Write config ---',
+    'info "Создаю конфиг..."',
+    'cat > "$CONFIG_FILE" << \'TOML\'',
+    '[server]',
+    'listen = "0.0.0.0:\'$PROXY_PORT\'"',
+    'workers = 0',
+    '',
+    '[server.api]',
+    'listen = "0.0.0.0:\'$API_PORT\'"',
+    'whitelist = ["0.0.0.0/0"]',
+    '',
+    '[[users]]',
+    'username = "default"',
+    'secret = "\'$SECRET\'"',
+    'enabled = true',
+    'TOML',
+    '',
+    '# Rewrite config with actual variable values',
+    'CONFIG_CONTENT="[server]\\nlisten = \\"0.0.0.0:${PROXY_PORT}\\"\\nworkers = 0\\n\\n[server.api]\\nlisten = \\"0.0.0.0:${API_PORT}\\"\\nwhitelist = [\\"0.0.0.0/0\\"]\\n\\n[[users]]\\nusername = \\"default\\"\\nsecret = \\"${SECRET}\\"\\nenabled = true"',
+    'printf "%b" "$CONFIG_CONTENT" > "$CONFIG_FILE"',
+    '',
+    '# --- Systemd service ---',
+    'info "Настраиваю systemd сервис..."',
+    'cat > "$SERVICE_FILE" << UNIT',
+    '[Unit]',
+    'Description=Telemt MTProxy Server',
+    'After=network.target',
+    '',
+    '[Service]',
+    'Type=simple',
+    'User=root',
+    'WorkingDirectory=$INSTALL_DIR',
+    'ExecStart=$INSTALL_DIR/telemt $CONFIG_FILE',
+    'Restart=always',
+    'RestartSec=5',
+    'LimitNOFILE=65536',
+    '',
+    '[Install]',
+    'WantedBy=multi-user.target',
+    'UNIT',
+    '',
+    '# --- Firewall ---',
+    'if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then',
+    '  info "Открываю порты в UFW..."',
+    '  ufw allow "${API_PORT}/tcp"   >/dev/null 2>&1 || true',
+    '  ufw allow "${PROXY_PORT}/tcp" >/dev/null 2>&1 || true',
+    'fi',
+    'if command -v firewall-cmd &>/dev/null; then',
+    '  info "Открываю порты в firewalld..."',
+    '  firewall-cmd --permanent --add-port="${API_PORT}/tcp"   >/dev/null 2>&1 || true',
+    '  firewall-cmd --permanent --add-port="${PROXY_PORT}/tcp" >/dev/null 2>&1 || true',
+    '  firewall-cmd --reload >/dev/null 2>&1 || true',
+    'fi',
+    '',
+    '# --- Start service ---',
+    'info "Запускаю telemt..."',
+    'systemctl daemon-reload',
+    'systemctl enable telemt >/dev/null 2>&1',
+    'systemctl restart telemt',
+    '',
+    '# Wait for API to come up',
+    'for i in $(seq 1 20); do',
+    '  if curl -fsSL --max-time 2 "http://127.0.0.1:${API_PORT}/v1/health" >/dev/null 2>&1; then',
+    '    info "API доступен"',
+    '    break',
+    '  fi',
+    '  [ "$i" -eq 20 ] && die "Telemt не запустился. Проверьте: journalctl -u telemt -n 50"',
+    '  sleep 1',
+    'done',
+    '',
+    '# --- Register with panel ---',
+    'info "Регистрирую ноду в панели..."',
+    'REG_RESPONSE=$(curl -fsSL --max-time 15 \\',
+    '  -X POST \\',
+    "  -H 'Content-Type: application/json' \\",
+    '  -d "{\\"token\\":\\"${REG_TOKEN}\\",\\"url\\":\\"http://${PUBLIC_IP}:${API_PORT}\\"}" \\',
+    '  "${PANEL_URL}/proxy/register" 2>&1)',
+    '',
+    'if echo "$REG_RESPONSE" | grep -q \'"ok":true\'; then',
+    '  info "Нода успешно зарегистрирована в панели!"',
+    'else',
+    '  warn "Не удалось зарегистрироваться. Ответ: $REG_RESPONSE"',
+    '  warn "Добавьте ноду вручную: http://${PUBLIC_IP}:${API_PORT}"',
+    'fi',
+    '',
+    '# --- Summary ---',
+    'echo ""',
+    'echo "========================================"',
+    'echo "  Telemt установлен и запущен!"',
+    'echo "========================================"',
+    'echo ""',
+    'echo "  Нода:         $NODE_NAME"',
+    'echo "  Публичный IP: $PUBLIC_IP"',
+    'echo "  API порт:     $API_PORT"',
+    'echo "  Proxy порт:   $PROXY_PORT"',
+    'echo "  Секрет:       $SECRET"',
+    'echo "  Конфиг:       $CONFIG_FILE"',
+    'echo ""',
+    'systemctl status telemt --no-pager -l | head -10 || true',
+    'echo ""',
+  ]
 
   res.setHeader('Content-Type', 'text/plain; charset=utf-8')
-  res.send(script)
+  res.send(lines.join('\n') + '\n')
 })
 
 // --- Proxy to remote telemt nodes ---
