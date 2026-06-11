@@ -109,15 +109,14 @@ async function handleReferral(userId, referrerId) {
 }
 
 // ─── Keyboards ────────────────────────────────────────────────────────────────
-function mainMenuKeyboard() {
+function mainMenuInlineKeyboard() {
   return {
-    keyboard: [
-      [{ text: '🔑 Тестовый доступ' }, { text: '💳 Купить доступ' }],
-      [{ text: '🔐 Мой доступ' }, { text: '👤 Профиль' }],
-      [{ text: '💬 Поддержка' }, { text: '📖 О нас' }],
-      [{ text: '👥 Рефералы' }, { text: '💰 Пополнить баланс' }],
-    ],
-    resize_keyboard: true,
+    inline_keyboard: [
+      [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
+      [{ text: '🔐 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
+      [{ text: '💬 Поддержка', callback_data: 'support' }, { text: '📖 О нас', callback_data: 'about' }],
+      [{ text: '👥 Рефералы', callback_data: 'referral' }, { text: '💰 Пополнить баланс', callback_data: 'topup' }],
+    ]
   }
 }
 
@@ -219,177 +218,17 @@ async function startBot() {
     }
     const s = await getSettings()
     const text = await buildMainMenuText(s)
-    const r = await bot.sendMessage(msg.chat.id, text, { parse_mode: 'Markdown', reply_markup: mainMenuKeyboard() })
-    // After /start we also send an inline-capable message that can be edited later
-    const inlineR = await bot.sendMessage(msg.chat.id, '👇 Используйте кнопки ниже:', {
-      reply_markup: { inline_keyboard: [[{ text: '💳 Купить доступ', callback_data: 'show_plans' }, { text: '🔑 Тест', callback_data: 'trial' }]] }
+    // Remove any old reply keyboard, send single inline message
+    await bot.sendMessage(msg.chat.id, '⠀', {
+      reply_markup: { remove_keyboard: true }
+    }).catch(() => {})
+    const r = await bot.sendMessage(msg.chat.id, text, {
+      parse_mode: 'Markdown',
+      reply_markup: mainMenuInlineKeyboard()
     })
-    if (inlineR?.ok && inlineR?.result) {
-      lastMsg.set(msg.from.id, { chatId: msg.chat.id, msgId: inlineR.result.message_id })
+    if (r?.ok && r?.result) {
+      lastMsg.set(msg.from.id, { chatId: msg.chat.id, msgId: r.result.message_id })
     }
-  })
-
-  // ── Тестовый доступ ─────────────────────────────────────────────────────────
-  bot.onText(/🔑 Тестовый доступ/, async (msg) => {
-    const userId = msg.from.id
-    await getOrCreateUser(msg.from)
-    const s = await getSettings()
-    const trialDays = s.trial_days || 1
-
-    const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
-    if (!result || result.error) {
-      const errMsg = result?.error || 'Ошибка'
-      const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
-      await showScreen(bot, msg.chat.id, userId,
-        isUsed
-          ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку, чтобы продолжить:'
-          : `❌ Ошибка: ${errMsg}`,
-        {
-          parse_mode: 'Markdown',
-          reply_markup: isUsed
-            ? { inline_keyboard: [[{ text: '💳 Купить доступ', callback_data: 'show_plans' }]] }
-            : { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-        }
-      )
-      return
-    }
-
-    const links = await getProxyLinks(userId)
-    const linkRows = buildLinksKeyboard(links)
-    const text = links.length > 0
-      ? `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*\n\n🔌 Нажмите кнопку для подключения:`
-      : `✅ *Тестовый доступ активирован!*\n\nСрок: *${trialDays} ${trialDays === 1 ? 'день' : 'дней'}*\n\n⏳ Зайдите в «Мой доступ» через минуту.`
-
-    await showScreen(bot, msg.chat.id, userId, text, {
-      parse_mode: 'Markdown',
-      reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
-    })
-  })
-
-  // ── Купить доступ ────────────────────────────────────────────────────────────
-  bot.onText(/💳 Купить доступ/, async (msg) => {
-    const plans = await getPlans()
-    if (!plans.length) {
-      await showScreen(bot, msg.chat.id, msg.from.id, '❌ Тарифы не настроены. Обратитесь к администратору.', {
-        reply_markup: { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-      })
-      return
-    }
-    const s = await getSettings()
-    await showScreen(bot, msg.chat.id, msg.from.id,
-      `📦 *${s.bot_name || 'Proxy'}*\n\nВыбери срок подписки:`,
-      { parse_mode: 'Markdown', reply_markup: plansKeyboard(plans) }
-    )
-  })
-
-  // ── Мой доступ ───────────────────────────────────────────────────────────────
-  bot.onText(/🔐 Мой доступ/, async (msg) => {
-    const userId = msg.from.id
-    const user = await getOrCreateUser(msg.from)
-    const now = Date.now()
-    const active = user.subscription_until && user.subscription_until > now
-
-    if (!active) {
-      await showScreen(bot, msg.chat.id, userId,
-        '❌ *Нет активного доступа*\n\nОформите подписку или активируйте тестовый период.',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [
-            [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить', callback_data: 'show_plans' }]
-          ]}
-        }
-      )
-      return
-    }
-
-    const screen = await buildAccessScreen(userId, user.subscription_until)
-    await showScreen(bot, msg.chat.id, userId, screen.text, { parse_mode: 'Markdown', reply_markup: screen.reply_markup })
-  })
-
-  // ── Профиль ──────────────────────────────────────────────────────────────────
-  bot.onText(/👤 Профиль/, async (msg) => {
-    const user = await getOrCreateUser(msg.from)
-    const now = Date.now()
-    const active = user.subscription_until && user.subscription_until > now
-    const reg = user.created_at ? new Date(user.created_at).toLocaleDateString('ru-RU') : '—'
-    let text = `👤 *Твой профиль*\n\n`
-    text += `🆔 ID: \`${msg.from.id}\`\n`
-    if (msg.from.username) text += `👤 Username: @${msg.from.username}\n`
-    text += `📝 Имя: ${msg.from.first_name || '—'}\n`
-    text += `📅 Регистрация: ${reg}\n\n`
-    text += `🔑 Доступ: ${active ? '✅ Активен' : '❌ Нет'}\n`
-    text += `👥 Рефералов: ${user.referral_count || 0}\n`
-    text += `💰 Баланс: ${(user.balance || 0).toFixed(2)} RUB`
-    await showScreen(bot, msg.chat.id, msg.from.id, text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-    })
-  })
-
-  // ── Поддержка ────────────────────────────────────────────────────────────────
-  bot.onText(/💬 Поддержка/, async (msg) => {
-    const s = await getSettings()
-    const link = s.support_link || ''
-    const text = link ? `💬 *Поддержка*\n\nСвяжитесь с нами: ${link}` : '💬 *Поддержка*\n\nОбратитесь к администратору бота.'
-    await showScreen(bot, msg.chat.id, msg.from.id, text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-    })
-  })
-
-  // ── О нас ────────────────────────────────────────────────────────────────────
-  bot.onText(/📖 О нас/, async (msg) => {
-    const s = await getSettings()
-    const about = s.about_text || 'Мы предоставляем надёжный MTProxy для Telegram.'
-    await showScreen(bot, msg.chat.id, msg.from.id, `📖 *О нас*\n\n${about}`, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-    })
-  })
-
-  // ── Реферальная программа ────────────────────────────────────────────────────
-  bot.onText(/👥 Реферальная программа/, async (msg) => {
-    const user = await getOrCreateUser(msg.from)
-    const s = await getSettings()
-    const bonusDays = s.ref_bonus_days || 3
-    const refLink = `https://t.me/${me.username}?start=${msg.from.id}`
-    let text = `👥 *Реферальная программа*\n\n`
-    text += `Приглашайте друзей и получайте бонусы!\n\n`
-    text += `🎁 За каждого приглашённого: *+${bonusDays} дн.* к подписке\n`
-    text += `👤 Ваших рефералов: *${user.referral_count || 0}*\n\n`
-    text += `🔗 Ваша ссылка:\n\`${refLink}\``
-    await showScreen(bot, msg.chat.id, msg.from.id, text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [
-        [{ text: '📤 Поделиться', url: `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Быстрый MTProxy для Telegram!')}` }],
-        [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-      ]}
-    })
-  })
-
-  // ── Пополнить баланс ─────────────────────────────────────────────────────────
-  bot.onText(/💰 Пополнить баланс/, async (msg) => {
-    await showScreen(bot, msg.chat.id, msg.from.id,
-      '💰 *Пополнение баланса*\n\nСпособ оплаты будет настроен позже. Обратитесь к администратору.',
-      {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]] }
-      }
-    )
-  })
-
-  // ── Главное меню (reply keyboard кнопка) ────────────────────────────────────
-  bot.onText(/🏠 Главное меню/, async (msg) => {
-    const s = await getSettings()
-    const text = await buildMainMenuText(s)
-    await showScreen(bot, msg.chat.id, msg.from.id, text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [
-        [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
-        [{ text: '🔐 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
-        [{ text: '👥 Рефералы', callback_data: 'referral' }, { text: '📖 О нас', callback_data: 'about' }]
-      ]}
-    })
   })
 
   // ── Callback queries (все редактируют существующее сообщение) ────────────────
@@ -402,14 +241,7 @@ async function startBot() {
     if (data === 'main_menu') {
       const s = await getSettings()
       const text = await buildMainMenuText(s)
-      await editScreen(bot, query, text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [
-          [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
-          [{ text: '🔐 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
-          [{ text: '👥 Рефералы', callback_data: 'referral' }, { text: '📖 О нас', callback_data: 'about' }]
-        ]}
-      })
+      await editScreen(bot, query, text, { parse_mode: 'Markdown', reply_markup: mainMenuInlineKeyboard() })
       return
     }
 
@@ -528,6 +360,28 @@ async function startBot() {
       const s = await getSettings()
       await editScreen(bot, query,
         `📖 *О нас*\n\n${s.about_text || 'Надёжный MTProxy для Telegram.'}`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
+        }
+      )
+      return
+    }
+
+    if (data === 'support') {
+      const s = await getSettings()
+      const link = s.support_link || ''
+      const text = link ? `💬 *Поддержка*\n\nСвяжитесь с нами: ${link}` : '💬 *Поддержка*\n\nОбратитесь к администратору бота.'
+      await editScreen(bot, query, text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
+      })
+      return
+    }
+
+    if (data === 'topup') {
+      await editScreen(bot, query,
+        '💰 *Пополнение баланса*\n\nСпособ оплаты будет настроен позже. Обратитесь к администратору.',
         {
           parse_mode: 'Markdown',
           reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
