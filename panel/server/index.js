@@ -210,11 +210,12 @@ app.delete('/users/:username', (req, res) => {
 // Force re-sync all registry users (with their individual secrets) to all nodes
 app.post('/sync', async (req, res) => {
   const currentNodes = loadNodes()
-  if (currentNodes.length === 0) return res.json({ ok: true, message: 'No nodes' })
+  if (currentNodes.length === 0) return res.json({ ok: true, message: 'No nodes', results: [] })
   const results = []
   for (const node of currentNodes) {
     const users = loadUsers()
-    let created = 0, updated = 0, failed = 0
+    let created = 0, rotated = 0, recreated = 0, failed = 0
+    const nodeErrors = []
     for (const user of users) {
       const body = { username: user.username, secret: user.secret, enabled: user.enabled !== false }
       if (user.max_tcp_conns) body.max_tcp_conns = user.max_tcp_conns
@@ -224,24 +225,51 @@ app.post('/sync', async (req, res) => {
       if (user.max_unique_ips) body.max_unique_ips = user.max_unique_ips
       if (user.expiration_rfc3339) body.expiration_rfc3339 = user.expiration_rfc3339
       if (user.user_ad_tag) body.user_ad_tag = user.user_ad_tag
+
       const createRes = await nodeApiRequest(node, 'POST', '/v1/users', body)
       if (createRes.ok) {
         created++
-      } else {
-        const isConflict = createRes.status === 409 || createRes.status === 422 ||
-          (createRes.body && (createRes.body.includes('exist') || createRes.body.includes('conflict')))
-        if (isConflict) {
-          const rotRes = await nodeApiRequest(node, 'POST',
-            `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`,
-            { secret: user.secret })
-          rotRes.ok ? updated++ : failed++
+        continue
+      }
+
+      const isConflict = createRes.status === 409 || createRes.status === 422 ||
+        (createRes.body && (createRes.body.includes('exist') || createRes.body.includes('conflict')))
+
+      if (!isConflict) {
+        failed++
+        nodeErrors.push(`${user.username}: create failed (${createRes.status})`)
+        continue
+      }
+
+      // User already exists — try rotate-secret first
+      const rotRes = await nodeApiRequest(node, 'POST',
+        `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`,
+        { secret: user.secret })
+
+      if (rotRes.ok) {
+        rotated++
+        continue
+      }
+
+      // rotate-secret not supported or failed — fallback: delete + recreate
+      console.log(`[sync] rotate-secret failed for "${user.username}" on node "${node.name}" (${rotRes.status}), trying delete+recreate`)
+      const delRes = await nodeApiRequest(node, 'DELETE',
+        `/v1/users/${encodeURIComponent(user.username)}`, null)
+      if (delRes.ok) {
+        const reCreateRes = await nodeApiRequest(node, 'POST', '/v1/users', body)
+        if (reCreateRes.ok) {
+          recreated++
         } else {
           failed++
+          nodeErrors.push(`${user.username}: recreate failed (${reCreateRes.status})`)
         }
+      } else {
+        failed++
+        nodeErrors.push(`${user.username}: delete failed (${delRes.status})`)
       }
     }
-    results.push({ node: node.name, created, updated, failed, total: users.length })
-    console.log(`[force-sync] Node "${node.name}": ${created} created, ${updated} secret-updated, ${failed} failed`)
+    results.push({ node: node.name, created, rotated, recreated, failed, errors: nodeErrors, total: users.length })
+    console.log(`[sync] Node "${node.name}": ${created} created, ${rotated} rotated, ${recreated} recreated, ${failed} failed`)
   }
   res.json({ ok: true, results })
 })

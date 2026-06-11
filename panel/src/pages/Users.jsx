@@ -436,6 +436,63 @@ function RotateSecretModal({ nodes, username, onClose, onDone }) {
   )
 }
 
+function SyncButton({ onLoad, toast }) {
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
+
+  const run = async () => {
+    setSyncing(true); setSyncResult(null)
+    try {
+      const r = await fetch('/proxy/sync', { method: 'POST' })
+      const d = await r.json()
+      if (d.ok) {
+        setSyncResult(d.results)
+        const totalFixed = d.results?.reduce((s, n) => s + n.rotated + n.recreated + n.created, 0) ?? 0
+        const totalFailed = d.results?.reduce((s, n) => s + n.failed, 0) ?? 0
+        if (totalFailed > 0) {
+          toast(`Синхронизировано: ${totalFixed} исправлено, ${totalFailed} ошибок`, 'error')
+        } else {
+          toast(`Синхронизировано: ${totalFixed} секретов применено`, 'success')
+        }
+        onLoad()
+      }
+    } catch (e) { toast('Ошибка синхронизации: ' + e.message, 'error') }
+    setSyncing(false)
+  }
+
+  return (
+    <div className="relative">
+      <button onClick={run} disabled={syncing} className="btn-ghost text-xs gap-1.5" title="Применить секреты из реестра ко всем нодам">
+        <Key size={13} className={syncing ? 'animate-pulse' : ''} />
+        {syncing ? 'Синхронизация...' : 'Синхронизировать'}
+      </button>
+      {syncResult && (
+        <div className="absolute right-0 top-full mt-2 z-50 w-72 bg-dark-800 border border-dark-500 rounded-xl shadow-2xl p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-gray-400">Результат синхронизации</span>
+            <button onClick={() => setSyncResult(null)} className="text-gray-600 hover:text-gray-300 text-xs">✕</button>
+          </div>
+          {syncResult.map((n, i) => (
+            <div key={i} className="text-xs space-y-1">
+              <div className="font-medium text-gray-300">{n.node}</div>
+              <div className="flex flex-wrap gap-1.5">
+                {n.created > 0 && <span className="badge-green">+{n.created} созд.</span>}
+                {n.rotated > 0 && <span className="px-1.5 py-0.5 rounded text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30">↻{n.rotated} ротир.</span>}
+                {n.recreated > 0 && <span className="badge-yellow">⟳{n.recreated} пересозд.</span>}
+                {n.failed > 0 && <span className="badge-red">✗{n.failed} ошибок</span>}
+                {(n.created + n.rotated + n.recreated + n.failed) === 0 && <span className="text-gray-600">нет пользователей</span>}
+              </div>
+              {n.errors?.length > 0 && (
+                <div className="text-red-400 text-xs">{n.errors.join(', ')}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ConfirmModal({ title, message, onConfirm, onClose, danger }) {
   const [loading, setLoading] = useState(false)
   return (
@@ -553,19 +610,7 @@ export default function Users() {
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           </button>
           {nodes.length > 0 && (
-            <button onClick={async () => {
-              try {
-                const r = await fetch('/proxy/sync', { method: 'POST' })
-                const d = await r.json()
-                if (d.ok) {
-                  const total = d.results?.reduce((s, n) => s + n.updated + n.created, 0) ?? 0
-                  toast(`Синхронизировано: ${total} пользователей обновлено`, 'success')
-                  load()
-                }
-              } catch { toast('Ошибка синхронизации', 'error') }
-            }} className="btn-ghost text-xs gap-1.5" title="Применить секреты из реестра ко всем нодам">
-              <Key size={13} />Синхронизировать
-            </button>
+            <SyncButton onLoad={load} toast={toast} />
           )}
           <button onClick={() => setModal({ type: 'create' })} className="btn-primary">
             <Plus size={15} />Добавить
