@@ -1,0 +1,10 @@
+{
+  "bot_token": "8380614292:AAEKHoPGjZpTbZIgzXD-rn5onyv8myBLu6k",
+  "bot_name": "Telemt Proxy",
+  "welcome_text": "Быстрый и надёжный сервис для работы с Telegram",
+  "features": "— Высокая скорость - никаких тормозов\n— Безопасность - не храним логи\n— Безлимит - пользуйся сколько хочешь\n— Стабильность - подключение к любым сервисам",
+  "support_link": "https://t.me/ShadowsockTM",
+  "about_text": "Мы предоставляем премиальный MTProxy для Telegram.",
+  "ref_bonus_days": 3,
+  "trial_days": 1
+}

@@ -33,12 +33,5 @@
     "days": 365,
     "price": 1290,
     "enabled": true
-  },
-  {
-    "id": "plan_1781185030093",
-    "label": "1 месяц",
-    "days": 30,
-    "price": 99,
-    "enabled": true
   }
 ]

@@ -1,0 +1,18 @@
+[
+  {
+    "telegram_id": 819452459,
+    "first_name": "MR",
+    "last_name": "Shadow",
+    "username": "ShadowsockTM",
+    "balance": 0,
+    "referral_count": 0,
+    "created_at": 1781185277969,
+    "updated_at": 1781185355358,
+    "proxy_username": "tg_819452459",
+    "proxy_secret": "447ae3ee18d2476906b5628d18e58719",
+    "subscription_until": 1783863738680,
+    "has_access": true,
+    "trial_used": true,
+    "subscription_plan": "month1"
+  }
+]
