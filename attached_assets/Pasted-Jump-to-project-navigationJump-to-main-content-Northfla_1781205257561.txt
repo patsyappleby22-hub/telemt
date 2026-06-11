@@ -1,0 +1,207 @@
+Jump to project navigationJump to main content
+Northflank Cloud Platform logo, to the homepage
+ST
+Current team:
+SAllakul's Team
+
+Current project:
+panel
+
+
+Create new
+
+Docs
+
+Support
+
+PA
+Patsy Appleby
+Project navigation
+Dashboard
+Services
+Jobs
+Volumes
+Addons
+Secrets
+Environments
+Templates
+Project template
+Project settings
+panel
+
+Service ID:
+panel
+
+Add a description
+
+
+Add tags
+p01--panel--psx7pzphx46r.code.run
+
+Europe - West
+Northflank
+patsyappleby22-hub/telemt
+main
+latest
+Build failed
+0.2 vCPU / 512 MB
+0 / 1
+CI
+
+CD
+
+
+
+
+
+Service navigation
+Overview
+
+Observability
+Deployments
+
+Run
+Resources
+
+Networking
+
+Environment
+
+Health checks
+
+CMD override
+
+Volumes
+
+Workload identities
+
+Code
+Builds
+
+Build options
+
+Build arguments
+
+Commits
+
+Billing
+
+panel /
+Builds /
+aware-waves-8684
+
+
+
+Failure
+Health
+Migrate to PostgreSQL + Northflank Docker deploy
+f105c02
+f105c027acbbcee23c5ee20c7729c2bd76bf4fb0
+
+patsyappleby22-hub/telemt
+main
+
+24 minutes ago
+00m 08s
+
+
+patsyappleby22-hub
+Dockerfile (buildkit)
+Remote cache disabled
+/
+/panel/Dockerfile
+x86
+Triggered by user via UI
+
+View arguments
+
+Rebuild
+
+Build progress
+
+Logs
+
+Metrics
+
+Health
+
+Events
+
+Dockerfile
+Connection
+Custom range (UTC)
+
+11.06.2026 18:48
+
+11.06.2026 18:52
+
+Search logs
+Search logs
+==
+!=
+ABC
+(.*)
+
+Returned 58 lines
+
+Direction
+2026-06-11T18:50:38.135245094Z stdout F [2026-06-11T18:50:38Z INFO ] Process terminated with exit code 11
+2026-06-11T18:50:38.12802059Z stderr F [error] BuildService - Build failed: Could not build the image.
+2026-06-11T18:50:37.452501665Z stdout F error: failed to solve: failed to compute cache key: failed to calculate checksum of ref wp3ha9ncf0do1dh8gjzu0cbbx::kkic0qynjjzb0uszrivcgyzjg: "/server": not found
+2026-06-11T18:50:37.452499641Z stdout F --------------------
+2026-06-11T18:50:37.452498628Z stdout F   20 |     
+2026-06-11T18:50:37.452497528Z stdout F   19 |     COPY --from=builder /app/dist ./dist
+2026-06-11T18:50:37.452496507Z stdout F   18 | >>> COPY server/ ./server/
+2026-06-11T18:50:37.452494776Z stdout F   17 |     
+2026-06-11T18:50:37.452483874Z stdout F   16 |     RUN npm install -g pnpm 2>/dev/null; pnpm install --prod --frozen-lockfile 2>/dev/null || npm install --production
+2026-06-11T18:50:37.45248191Z stdout F --------------------
+2026-06-11T18:50:37.45247723Z stdout F Dockerfile:18
+2026-06-11T18:50:37.451436326Z stdout F ------
+2026-06-11T18:50:37.451433285Z stdout F  > [stage-1 5/6] COPY server/ ./server/:
+2026-06-11T18:50:37.451431985Z stdout F ------
+2026-06-11T18:50:37.451430362Z stdout F ------
+2026-06-11T18:50:37.451428798Z stdout F  > [builder 3/6] COPY package.json pnpm-lock.yaml* package-lock.json* ./:
+2026-06-11T18:50:37.451425818Z stdout F ------
+2026-06-11T18:50:37.451421498Z stdout F #9 CANCELED
+2026-06-11T18:50:37.450518446Z stdout F #9 [builder 2/6] WORKDIR /app
+2026-06-11T18:50:37.450516937Z stdout F 
+2026-06-11T18:50:37.450515449Z stdout F #8 ERROR: failed to calculate checksum of ref wp3ha9ncf0do1dh8gjzu0cbbx::kkic0qynjjzb0uszrivcgyzjg: "/package.json": not found
+2026-06-11T18:50:37.450514086Z stdout F #8 [builder 3/6] COPY package.json pnpm-lock.yaml* package-lock.json* ./
+2026-06-11T18:50:37.450512296Z stdout F 
+2026-06-11T18:50:37.450508237Z stdout F #7 ERROR: failed to calculate checksum of ref wp3ha9ncf0do1dh8gjzu0cbbx::kkic0qynjjzb0uszrivcgyzjg: "/server": not found
+2026-06-11T18:50:37.450300165Z stdout F #7 [stage-1 5/6] COPY server/ ./server/
+2026-06-11T18:50:37.450298436Z stdout F 
+2026-06-11T18:50:37.450297005Z stdout F #6 CACHED
+2026-06-11T18:50:37.450292639Z stdout F #6 [stage-1 4/6] RUN npm install -g pnpm 2>/dev/null; pnpm install --prod --frozen-lockfile 2>/dev/null || npm install --production
+2026-06-11T18:50:37.450019484Z stdout F 
+2026-06-11T18:50:37.450017988Z stdout F #5 DONE 0.2s
+2026-06-11T18:50:37.450016432Z stdout F #5 transferring context: 8.27MB 0.2s done
+2026-06-11T18:50:37.450014802Z stdout F #5 [internal] load build context
+2026-06-11T18:50:37.450012938Z stdout F 
+2026-06-11T18:50:37.45001167Z stdout F #4 ...
+2026-06-11T18:50:37.450009953Z stdout F #4 sha256:6a0ac1617861a677b045b7ff88545213ec31c0ff08763195a70a4a5adda577bb 0B / 3.86MB 0.2s
+2026-06-11T18:50:37.450005744Z stdout F #4 sha256:4feea04c154301db6f4a496efa397b3db96603b1c009c797cfdde77bea8b3287 0B / 43.23MB 0.2s
+2026-06-11T18:50:37.449723326Z stdout F #4 sha256:b2cbbfe903b0821005780971ddc5892edcc4ce74c5a48d82e1d2b382edac3122 0B / 1.26MB 0.2s
+2026-06-11T18:50:37.449705824Z stdout F #4 sha256:fff4e2c1b189bf87d63ad8bd07f7f4eb288d6f2b6a07a8bb44c60e8c075d2096 0B / 445B 0.2s
+2026-06-11T18:50:37.332678167Z stdout F #4 resolve docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 done
+2026-06-11T18:50:37.332666127Z stdout F #4 [builder 1/6] FROM docker.io/library/node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+2026-06-11T18:50:37.330962647Z stdout F 
+2026-06-11T18:50:37.330961369Z stdout F #3 DONE 0.0s
+2026-06-11T18:50:37.330952021Z stdout F #3 transferring context: 202B done
+2026-06-11T18:50:37.330582234Z stdout F #3 [internal] load .dockerignore
+2026-06-11T18:50:37.33056776Z stdout F 
+2026-06-11T18:50:37.153132296Z stdout F #2 DONE 1.2s
+2026-06-11T18:50:36.093788795Z stdout F #2 [internal] load metadata for docker.io/library/node:20-alpine
+2026-06-11T18:50:36.093787697Z stdout F 
+2026-06-11T18:50:36.093786109Z stdout F #1 DONE 0.0s
+2026-06-11T18:50:36.093529698Z stdout F #1 transferring dockerfile: 647B done
+2026-06-11T18:50:36.093243813Z stdout F #1 [internal] load build definition from Dockerfile
+2026-06-11T18:50:35.695271168Z stderr F  * branch            f105c027acbbcee23c5ee20c7729c2bd76bf4fb0 -> FETCH_HEAD
+2026-06-11T18:50:35.69495591Z stderr F From https://github.com/patsyappleby22-hub/telemt
+2026-06-11T18:50:34.968222948Z stderr F POST git-upload-pack (185 bytes)
+2026-06-11T18:50:34.633182907Z stdout F Initialized empty Git repository in /root/workspace/.git/
+2026-06-11T18:50:33.794491962Z stdout F [2026-06-11T18:50:33Z INFO ] Starting container entrypoint...
+2026-06-11T18:50:33.794490616Z stdout F [2026-06-11T18:50:33Z INFO ] Successfully fetched environment variables
+2026-06-11T18:50:33.794472402Z stdout F [2026-06-11T18:50:33Z INFO ] Securely fetching environment variables
+All services normal
+HomeDocsChangelogBlog
