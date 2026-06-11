@@ -57,6 +57,17 @@ function CopyButton({ text }) {
 
 function UserActionsMenu({ user, onAction }) {
   const [open, setOpen] = useState(false)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const btnRef = React.useRef(null)
+
+  const toggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+    setOpen(v => !v)
+  }
+
   const actions = [
     { id: 'view', label: 'Подробнее', icon: Eye },
     { id: 'rotate', label: 'Сменить секрет', icon: Key },
@@ -67,14 +78,15 @@ function UserActionsMenu({ user, onAction }) {
     { id: 'delete', label: 'Удалить', icon: Trash2, danger: true },
   ]
   return (
-    <div className="relative">
-      <button onClick={() => setOpen(!open)} className="p-1.5 text-gray-500 hover:text-gray-200 hover:bg-dark-600 rounded transition-colors">
+    <div>
+      <button ref={btnRef} onClick={toggle} className="p-1.5 text-gray-500 hover:text-gray-200 hover:bg-dark-600 rounded transition-colors">
         <MoreVertical size={15} />
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 w-44 bg-dark-700 border border-dark-500 rounded-xl shadow-2xl overflow-hidden">
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed z-50 w-48 bg-dark-700 border border-dark-500 rounded-xl shadow-2xl overflow-hidden"
+            style={{ top: pos.top, right: pos.right }}>
             {actions.map(({ id, label, icon: Icon, danger }) => (
               <button key={id} onClick={() => { setOpen(false); onAction(id, user) }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors ${danger ? 'text-red-400 hover:bg-red-900/30' : 'text-gray-300 hover:bg-dark-600'}`}>
