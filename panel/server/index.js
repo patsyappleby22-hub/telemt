@@ -134,6 +134,8 @@ app.get('/update.sh', (req, res) => {
     'info "Собираю telemt (может занять несколько минут)..."',
     'export PATH="$HOME/.cargo/bin:$PATH"',
     'cargo build --release 2>&1 | tail -5',
+    'info "Останавливаю сервис для замены бинарника..."',
+    'systemctl stop telemt 2>/dev/null || true',
     'cp target/release/telemt "$BINARY"',
     'chmod +x "$BINARY"',
     'info "Версия: $("$BINARY" --version 2>/dev/null || echo ok)"',
