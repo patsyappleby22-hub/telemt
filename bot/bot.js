@@ -162,15 +162,33 @@ async function showScreen(bot, chatId, userId, text, opts = {}) {
   return r?.result
 }
 
-// For callback queries: always edit in-place
+// For callback queries: edit in-place, fall back to new message if edit fails
 async function editScreen(bot, query, text, opts = {}) {
   const chatId = query.message.chat.id
   const msgId = query.message.message_id
   const userId = query.from.id
 
-  const r = await bot.editMessageText(chatId, msgId, text, opts)
-  if (r && r.ok) {
-    lastMsg.set(userId, { chatId, msgId })
+  try {
+    const r = await bot.editMessageText(chatId, msgId, text, opts)
+    if (r && r.ok) {
+      lastMsg.set(userId, { chatId, msgId })
+      return r.result
+    }
+    // Telegram returned ok:false — log and fall through to send
+    console.warn(`[bot] editMessageText failed: ${JSON.stringify(r?.description || r)}`)
+  } catch (e) {
+    console.warn('[bot] editMessageText error:', e.message)
+  }
+
+  // Fallback: send a fresh message
+  try {
+    const sent = await bot.sendMessage(chatId, text, opts)
+    if (sent && sent.ok && sent.result) {
+      lastMsg.set(userId, { chatId, msgId: sent.result.message_id })
+      return sent.result
+    }
+  } catch (e) {
+    console.error('[bot] sendMessage fallback error:', e.message)
   }
 }
 
