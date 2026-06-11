@@ -142,15 +142,16 @@ async function syncUsersToNode(node) {
 const regTokens = new Map()
 
 const parseJson = express.json()
+const router = express.Router()
 
 // ── Node CRUD ──────────────────────────────────────────────────────────────────
 
-app.get('/nodes', async (req, res) => {
+router.get('/nodes', async (req, res) => {
   const nodes = await loadNodes()
   res.json(nodes.map(n => ({ ...n, auth_token: n.auth_token ? '***' : undefined })))
 })
 
-app.post('/nodes', parseJson, async (req, res) => {
+router.post('/nodes', parseJson, async (req, res) => {
   const { name, url, auth_token } = req.body
   if (!name || !url) return res.status(400).json({ error: 'name and url required' })
   const id = crypto.randomUUID()
@@ -160,7 +161,7 @@ app.post('/nodes', parseJson, async (req, res) => {
   res.json({ ...node, auth_token: auth_token ? '***' : undefined })
 })
 
-app.patch('/nodes/:id', parseJson, async (req, res) => {
+router.patch('/nodes/:id', parseJson, async (req, res) => {
   const nodes = await loadNodes()
   const node = nodes.find(n => n.id === req.params.id)
   if (!node) return res.status(404).json({ error: 'Not found' })
@@ -172,7 +173,7 @@ app.patch('/nodes/:id', parseJson, async (req, res) => {
   res.json({ ...node, auth_token: node.auth_token ? '***' : undefined })
 })
 
-app.delete('/nodes/:id', async (req, res) => {
+router.delete('/nodes/:id', async (req, res) => {
   const nodes = await loadNodes()
   const node = nodes.find(n => n.id === req.params.id)
   if (!node) return res.status(404).json({ error: 'Not found' })
@@ -182,7 +183,7 @@ app.delete('/nodes/:id', async (req, res) => {
 
 // ── Auto-registration ──────────────────────────────────────────────────────────
 
-app.post('/tokens', parseJson, (req, res) => {
+router.post('/tokens', parseJson, (req, res) => {
   const { name, panel_url } = req.body
   if (!name) return res.status(400).json({ error: 'name required' })
   if (!panel_url) return res.status(400).json({ error: 'panel_url required' })
@@ -195,7 +196,7 @@ app.post('/tokens', parseJson, (req, res) => {
   res.json({ token, expires_at })
 })
 
-app.post('/register', parseJson, async (req, res) => {
+router.post('/register', parseJson, async (req, res) => {
   const { token, url } = req.body
   if (!token) return res.status(400).json({ error: 'token required' })
   if (!url) return res.status(400).json({ error: 'url required' })
@@ -218,26 +219,26 @@ app.post('/register', parseJson, async (req, res) => {
 
 // ── User registry ──────────────────────────────────────────────────────────────
 
-app.get('/users', async (req, res) => {
+router.get('/users', async (req, res) => {
   const users = await loadUsers()
   res.json(users.map(u => ({ username: u.username, enabled: u.enabled })))
 })
 
-app.post('/users', parseJson, async (req, res) => {
+router.post('/users', parseJson, async (req, res) => {
   const { username, secret, ...settings } = req.body
   if (!username || !secret) return res.status(400).json({ error: 'username and secret required' })
   await saveUser({ username, secret, ...settings, updated_at: Date.now() })
   res.json({ ok: true })
 })
 
-app.delete('/users/:username', async (req, res) => {
+router.delete('/users/:username', async (req, res) => {
   await deleteUser(req.params.username)
   res.json({ ok: true })
 })
 
 // ── Force sync ─────────────────────────────────────────────────────────────────
 
-app.post('/sync', async (req, res) => {
+router.post('/sync', async (req, res) => {
   const currentNodes = await loadNodes()
   if (currentNodes.length === 0) return res.json({ ok: true, message: 'No nodes', results: [] })
   const results = []
@@ -283,7 +284,7 @@ app.post('/sync', async (req, res) => {
 
 // ── Install / update scripts ───────────────────────────────────────────────────
 
-app.get('/update.sh', (req, res) => {
+router.get('/update.sh', (req, res) => {
   const { node_url } = req.query
   const B = '`'
   const lines = [
@@ -322,7 +323,7 @@ app.get('/update.sh', (req, res) => {
   res.send(lines.join('\n') + '\n')
 })
 
-app.get('/setup.sh', (req, res) => {
+router.get('/setup.sh', (req, res) => {
   const { token, name, panel_url, api_port = '9091', proxy_port = '8443' } = req.query
   if (!token || !panel_url) return res.status(400).send('# Error: token and panel_url required\n')
 
@@ -463,7 +464,7 @@ app.get('/setup.sh', (req, res) => {
 
 // ── Proxy to remote telemt nodes ───────────────────────────────────────────────
 
-app.use('/nodes/:id/api', async (req, res) => {
+router.use('/nodes/:id/api', async (req, res) => {
   const nodes = await loadNodes()
   const node = nodes.find(n => n.id === req.params.id)
   if (!node) return res.status(404).json({ error: 'Node not found' })
@@ -501,15 +502,15 @@ app.use('/nodes/:id/api', async (req, res) => {
 // BOT API ROUTES
 // ══════════════════════════════════════════════════════════════════════════════
 
-app.get('/bot/plans', async (req, res) => { res.json(await loadPlans()) })
+router.get('/bot/plans', async (req, res) => { res.json(await loadPlans()) })
 
-app.post('/bot/plans', parseJson, async (req, res) => {
+router.post('/bot/plans', parseJson, async (req, res) => {
   if (!Array.isArray(req.body)) return res.status(400).json({ error: 'Array expected' })
   await savePlans(req.body)
   res.json({ ok: true })
 })
 
-app.patch('/bot/plans/:id', parseJson, async (req, res) => {
+router.patch('/bot/plans/:id', parseJson, async (req, res) => {
   const plans = await loadPlans()
   const idx = plans.findIndex(p => p.id === req.params.id)
   if (idx === -1) return res.status(404).json({ error: 'Not found' })
@@ -518,18 +519,18 @@ app.patch('/bot/plans/:id', parseJson, async (req, res) => {
   res.json(plans[idx])
 })
 
-app.delete('/bot/plans/:id', async (req, res) => {
+router.delete('/bot/plans/:id', async (req, res) => {
   const plans = await loadPlans()
   await savePlans(plans.filter(p => p.id !== req.params.id))
   res.json({ ok: true })
 })
 
-app.get('/bot/settings', async (req, res) => {
+router.get('/bot/settings', async (req, res) => {
   const s = await loadBotSettings()
   res.json({ ...s, bot_token: s.bot_token ? '***' : '' })
 })
 
-app.patch('/bot/settings', parseJson, async (req, res) => {
+router.patch('/bot/settings', parseJson, async (req, res) => {
   const cur = await loadBotSettings()
   const update = { ...req.body }
   if (update.bot_token === '***') delete update.bot_token
@@ -537,27 +538,27 @@ app.patch('/bot/settings', parseJson, async (req, res) => {
   res.json({ ok: true })
 })
 
-app.get('/bot/users', async (req, res) => { res.json(await loadBotUsers()) })
+router.get('/bot/users', async (req, res) => { res.json(await loadBotUsers()) })
 
-app.get('/bot/users/:telegram_id', async (req, res) => {
+router.get('/bot/users/:telegram_id', async (req, res) => {
   const u = await getBotUser(Number(req.params.telegram_id))
   if (!u) return res.status(404).json({ error: 'Not found' })
   res.json(u)
 })
 
-app.patch('/bot/users/:telegram_id', parseJson, async (req, res) => {
+router.patch('/bot/users/:telegram_id', parseJson, async (req, res) => {
   const u = await upsertBotUser(Number(req.params.telegram_id), req.body)
   res.json(u)
 })
 
-app.delete('/bot/users/:telegram_id', async (req, res) => {
+router.delete('/bot/users/:telegram_id', async (req, res) => {
   await query('DELETE FROM bot_users WHERE telegram_id = $1', [Number(req.params.telegram_id)])
   res.json({ ok: true })
 })
 
-app.get('/bot/payments', async (req, res) => { res.json(await loadPayments()) })
+router.get('/bot/payments', async (req, res) => { res.json(await loadPayments()) })
 
-app.post('/bot/payments', parseJson, async (req, res) => {
+router.post('/bot/payments', parseJson, async (req, res) => {
   const p = { id: crypto.randomUUID(), ...req.body, created_at: Date.now() }
   await query(
     'INSERT INTO payments (id, telegram_id, plan_id, amount, status, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
@@ -566,7 +567,7 @@ app.post('/bot/payments', parseJson, async (req, res) => {
   res.json(p)
 })
 
-app.get('/bot/users/:telegram_id/links', async (req, res) => {
+router.get('/bot/users/:telegram_id/links', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const user = await getBotUser(telegramId)
   if (!user || !user.proxy_username) return res.json({ links: [] })
@@ -591,7 +592,7 @@ app.get('/bot/users/:telegram_id/links', async (req, res) => {
   res.json({ links: [...new Set(allLinks)], username })
 })
 
-app.get('/bot/stats', async (req, res) => {
+router.get('/bot/stats', async (req, res) => {
   const now = Date.now()
   const usersR = await query('SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE subscription_until > $1) as active FROM bot_users', [now])
   const revR = await query(`SELECT COALESCE(SUM(amount),0) as total, COALESCE(SUM(CASE WHEN created_at > $1 THEN amount ELSE 0 END),0) as today FROM payments WHERE status='paid'`, [now - 86400000])
@@ -603,7 +604,7 @@ app.get('/bot/stats', async (req, res) => {
   })
 })
 
-app.post('/bot/users/:telegram_id/activate', parseJson, async (req, res) => {
+router.post('/bot/users/:telegram_id/activate', parseJson, async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const { plan_id } = req.body
   const plans = await loadPlans()
@@ -635,7 +636,7 @@ app.post('/bot/users/:telegram_id/activate', parseJson, async (req, res) => {
   res.json(updated)
 })
 
-app.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
+router.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const username = generateProxyUsername(telegramId)
 
@@ -650,7 +651,7 @@ app.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
   res.json(updated)
 })
 
-app.post('/bot/users/:telegram_id/trial', async (req, res) => {
+router.post('/bot/users/:telegram_id/trial', async (req, res) => {
   const telegramId = Number(req.params.telegram_id)
   const user = await getBotUser(telegramId)
   if (user && user.trial_used) return res.status(400).json({ error: 'Trial already used' })
@@ -677,6 +678,14 @@ app.post('/bot/users/:telegram_id/trial', async (req, res) => {
   })
   res.json(updated)
 })
+
+// ── Mount API router ───────────────────────────────────────────────────────────
+
+app.use('/proxy', router)
+
+// ── Health check ───────────────────────────────────────────────────────────────
+
+app.get('/health', (req, res) => res.json({ ok: true }))
 
 // ── Serve built React frontend (production) ────────────────────────────────────
 
