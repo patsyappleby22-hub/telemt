@@ -1,0 +1,212 @@
+Jump to project navigationJump to main content
+Northflank Cloud Platform logo, to the homepage
+ST
+Current team:
+SAllakul's Team
+
+Current project:
+panel
+
+
+Create new
+
+Docs
+
+Support
+
+PA
+Patsy Appleby
+Project navigation
+Dashboard
+Services
+Jobs
+Volumes
+Addons
+Secrets
+Environments
+Templates
+Project template
+Project settings
+panel
+
+Service ID:
+panel
+
+Add a description
+
+
+Add tags
+p01--panel--psx7pzphx46r.code.run
+
+Europe - West
+Northflank
+patsyappleby22-hub/telemt
+main
+latest
+Build failed
+0.2 vCPU / 512 MB
+0 / 1
+CI
+
+CD
+
+
+
+
+
+Service navigation
+Overview
+
+Observability
+Deployments
+
+Run
+Resources
+
+Networking
+
+Environment
+
+Health checks
+
+CMD override
+
+Volumes
+
+Workload identities
+
+Code
+Builds
+
+Build options
+
+Build arguments
+
+Commits
+
+Billing
+
+panel /
+Builds /
+valid-suit-9199
+
+
+
+Failure
+Health
+Migrate to PostgreSQL + Northflank Docker deploy
+f105c02
+f105c027acbbcee23c5ee20c7729c2bd76bf4fb0
+
+patsyappleby22-hub/telemt
+main
+
+2 hours ago
+00m 10s
+
+
+patsyappleby22-hub
+Dockerfile (buildkit)
+Remote cache disabled
+/panel
+/Dockerfile
+x86
+Triggered by user via UI
+
+View arguments
+
+Rebuild
+
+Build progress
+
+Logs
+
+Metrics
+
+Health
+
+Events
+
+Dockerfile
+Connection
+Custom range (UTC)
+
+11.06.2026 16:27
+
+11.06.2026 16:31
+
+Search logs
+Search logs
+==
+!=
+ABC
+(.*)
+
+Returned 76 lines
+
+Direction
+2026-06-11T16:29:23.096996957Z stdout F [2026-06-11T16:29:23Z INFO ] Process terminated with exit code 11
+2026-06-11T16:29:23.088594407Z stderr F [error] BuildService - Build failed: Could not build the image.
+2026-06-11T16:29:22.067549501Z stdout F error: failed to solve: failed to compute cache key: failed to calculate checksum of ref vu967w4tiahwem81o50eeg25e::i4sbfatziqde6bns1jkmn3oje: "/config.toml": not found
+2026-06-11T16:29:22.067548082Z stdout F --------------------
+2026-06-11T16:29:22.067547143Z stdout F  121 |     USER nonroot:nonroot
+2026-06-11T16:29:22.067545959Z stdout F  120 |     
+2026-06-11T16:29:22.067544865Z stdout F  119 | >>> COPY config.toml /app/config.toml
+2026-06-11T16:29:22.06754363Z stdout F  118 |     COPY --from=minimal /telemt /app/telemt
+2026-06-11T16:29:22.067542352Z stdout F  117 |     
+2026-06-11T16:29:22.067537816Z stdout F --------------------
+2026-06-11T16:29:22.067309532Z stdout F Dockerfile:119
+2026-06-11T16:29:22.065496069Z stdout F ------
+2026-06-11T16:29:22.065091128Z stdout F  > [prod 4/4] COPY config.toml /app/config.toml:
+2026-06-11T16:29:22.065086007Z stdout F ------
+2026-06-11T16:29:22.04593089Z stdout F #14 DONE 0.1s
+2026-06-11T16:29:22.04592963Z stdout F #14 resolve gcr.io/distroless/static-debian12:latest@sha256:9c346e4be81b5ca7ff31a0d89eaeade58b0f95cfd3baed1f36083ddb47ca3160 0.0s done
+2026-06-11T16:29:22.045928326Z stdout F #14 [prod 1/4] FROM gcr.io/distroless/static-debian12:latest@sha256:9c346e4be81b5ca7ff31a0d89eaeade58b0f95cfd3baed1f36083ddb47ca3160
+2026-06-11T16:29:22.04592673Z stdout F 
+2026-06-11T16:29:22.045925557Z stdout F #13 DONE 0.0s
+2026-06-11T16:29:22.045924184Z stdout F #13 resolve docker.io/library/debian:12-slim@sha256:96e378d7e6531ac9a15ad505478fcc2e69f371b10f5cdf87857c4b8188404716 0.0s done
+2026-06-11T16:29:22.045922719Z stdout F #13 [minimal 1/3] FROM docker.io/library/debian:12-slim@sha256:96e378d7e6531ac9a15ad505478fcc2e69f371b10f5cdf87857c4b8188404716
+2026-06-11T16:29:22.045920649Z stdout F 
+2026-06-11T16:29:22.045905298Z stdout F #12 ERROR: failed to calculate checksum of ref vu967w4tiahwem81o50eeg25e::i4sbfatziqde6bns1jkmn3oje: "/config.toml": not found
+2026-06-11T16:29:22.04527657Z stdout F #12 [prod 4/4] COPY config.toml /app/config.toml
+2026-06-11T16:29:22.045275181Z stdout F 
+2026-06-11T16:29:22.045274357Z stdout F #11 CACHED
+2026-06-11T16:29:22.045263093Z stdout F #11 [prod 3/4] COPY --from=minimal /telemt /app/telemt
+2026-06-11T16:29:22.045261377Z stdout F 
+2026-06-11T16:29:22.045260346Z stdout F #10 CACHED
+2026-06-11T16:29:22.045258598Z stdout F #10 [minimal 2/3] RUN set -eux;     apt-get update;     apt-get install -y --no-install-recommends         binutils         ca-certificates         curl         tar;     rm -rf /var/lib/apt/lists/*
+2026-06-11T16:29:22.045248292Z stdout F 
+2026-06-11T16:29:22.045006425Z stdout F #9 CACHED
+2026-06-11T16:29:22.044987476Z stdout F #9 [minimal 3/3] RUN set -eux;     case "amd64" in         amd64) ASSET="telemt-x86_64-linux-musl.tar.gz" ;;         arm64) ASSET="telemt-aarch64-linux-musl.tar.gz" ;;         *) echo "Unsupported TARGETARCH: amd64" >&2; exit 1 ;;     esac;     VERSION="latest";     if [ -z "${VERSION}" ] || [ "${VERSION}" = "latest" ]; then         BASE_URL="https://github.com/telemt/telemt/releases/latest/download";;     else         BASE_URL="https://github.com/telemt/telemt/releases/download/${VERSION}";;     fi;     curl -fL         --retry 5         --retry-delay 3         --connect-timeout 10         --max-time 120         -o "/tmp/${ASSET}"         "${BASE_URL}/${ASSET}";     curl -fL         --retry 5         --retry-delay 3         --connect-timeout 10         --max-time 120         -o "/tmp/${ASSET}.sha256"         "${BASE_URL}/${ASSET}.sha256";     cd /tmp;     sha256sum -c "${ASSET}.sha256";     tar -xzf "${ASSET}" -C /tmp;     test -f /tmp/telemt;    
+[
+]
+2026-06-11T16:29:22.044982857Z stdout F 
+2026-06-11T16:29:22.044973872Z stdout F #8 CACHED
+2026-06-11T16:29:22.044296275Z stdout F #8 [prod 2/4] WORKDIR /app
+2026-06-11T16:29:22.043989968Z stdout F 
+2026-06-11T16:29:22.043988816Z stdout F #7 DONE 0.0s
+2026-06-11T16:29:22.04398722Z stdout F #7 transferring context: 2B done
+2026-06-11T16:29:22.043985907Z stdout F #7 [internal] load build context
+2026-06-11T16:29:22.043984537Z stdout F 
+2026-06-11T16:29:22.043983209Z stdout F #6 DONE 0.0s
+2026-06-11T16:29:22.043980062Z stdout F #6 transferring context: 69B done
+2026-06-11T16:29:22.043954903Z stdout F #6 [internal] load .dockerignore
+2026-06-11T16:29:22.043565449Z stdout F 
+2026-06-11T16:29:21.891376676Z stdout F #4 DONE 1.6s
+2026-06-11T16:29:21.130395513Z stdout F #4 [internal] load metadata for gcr.io/distroless/static-debian12:latest
+2026-06-11T16:29:21.13036905Z stdout F 
+2026-06-11T16:29:20.979937087Z stdout F #5 DONE 0.7s
+2026-06-11T16:29:20.979935577Z stdout F #5 [internal] load metadata for docker.io/library/debian:12-slim
+2026-06-11T16:29:20.979932804Z stdout F 
+2026-06-11T16:29:20.979908541Z stdout F #4 ...
+2026-06-11T16:29:20.260874404Z stdout F #4 [internal] load metadata for gcr.io/distroless/static-debian12:latest
+2026-06-11T16:29:20.260840695Z stdout F 
+2026-06-11T16:29:20.118534755Z stdout F #3 DONE 0.7s
+2026-06-11T16:29:20.118511351Z stdout F #3 extracting sha256:50ba52cd6a2c01eaf1a9efbedc7c75b5da5e3965c1586001c722980487a73fd7 0.2s done
+2026-06-11T16:29:20.073947022Z stdout F #3 extracting sha256:50ba52cd6a2c01eaf1a9efbedc7c75b5da5e3965c1586001c722980487a73fd7
+2026-06-11T16:29:20.073924705Z stdout F #3 sha256:50ba52cd6a2c01eaf1a9efbedc7c75b5da5e3965c1586001c722980487a73fd7 14.36MB / 14.36MB 0.5s done
+2026-06-11T16:29:19.91615342Z stdout F #3 sha256:50ba52cd6a2c01eaf1a9efbedc7c75b5da5e3965c1586001c722980487a73fd7 14.36MB / 14.36MB 0.5s
+2026-06-11T16:29:19.615417605Z stdout F #3 sha256:50ba52cd6a2c01eaf1a9efbedc7c75b5da5e3965c1586001c722980487a73fd7 0B / 14.36MB 0.2s
+2026-06-11T16:29:19.612266986Z stdout F #3 resolve docker.io/docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89 done
+All services normal
+HomeDocsChangelogBlog
