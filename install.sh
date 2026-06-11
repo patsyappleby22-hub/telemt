@@ -7,7 +7,15 @@ INSTALL_DIR="${INSTALL_DIR:-/bin}"
 CONFIG_DIR="${CONFIG_DIR:-/etc/telemt}"
 CONFIG_FILE="${CONFIG_FILE:-${CONFIG_DIR}/telemt.toml}"
 WORK_DIR="${WORK_DIR:-/opt/telemt}"
-TLS_DOMAIN="${TLS_DOMAIN:-petrovich.ru}"
+if [ -z "${TLS_DOMAIN:-}" ]; then
+    _tld_seed=$(od -A n -t d4 -N 4 /dev/urandom 2>/dev/null | tr -d ' \n' || printf '%s' "$$")
+    TLS_DOMAIN=$(awk -v seed="$_tld_seed" 'BEGIN{
+        srand(seed+0)
+        n=split("microsoft.com windowsupdate.com docker.com gps.gov apple.com amazon.com github.com cloudflare.com live.com office.com update.microsoft.com fastly.net digicert.com aka.ms cdn.cloudflare.com storage.googleapis.com s3.amazonaws.com updates.cdn-apple.com ocsp.digicert.com", a, " ")
+        print a[int(rand()*n)+1]
+    }')
+    unset _tld_seed
+fi
 SERVER_PORT="${SERVER_PORT:-443}"
 USER_SECRET=""
 AD_TAG=""
@@ -297,7 +305,7 @@ show_help() {
         say "  purge        Полностью удалить вместе с конфигурацией, данными и пользователем"
         say ""
         say "Опции:"
-        say "  -d, --domain Указать домен TLS (по умолчанию: petrovich.ru)"
+        say "  -d, --domain Указать домен TLS (по умолчанию: случайный из встроенного списка)"
         say "  -p, --port   Указать порт сервера (по умолчанию: 443)"
         say "  -s, --secret Указать секрет пользователя (32 hex символа)"
         say "  -a, --ad-tag Указать ad_tag"
@@ -310,7 +318,7 @@ show_help() {
         say "  purge        Remove everything including configuration, data, and user"
         say ""
         say "Options:"
-        say "  -d, --domain Set TLS domain (default: petrovich.ru)"
+        say "  -d, --domain Set TLS domain (default: random from built-in list)"
         say "  -p, --port   Set server port (default: 443)"
         say "  -s, --secret Set specific user secret (32 hex characters)"
         say "  -a, --ad-tag Set ad_tag"
