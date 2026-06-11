@@ -106,6 +106,17 @@ function generateSecret() {
   return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+// Keep only first result per unique node URL (deduplicates same-VPS entries)
+function dedupeByUrl(nodeResults) {
+  const seen = new Set()
+  return nodeResults.filter(r => {
+    const key = r.node?.url || r.node?.id
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
 function NodeLinksBlock({ nodeName, links }) {
   const allLinks = [
     ...filterValidLinks(links?.tls).map(l => ['TLS', l]),
@@ -221,7 +232,7 @@ function CreateUserModal({ nodes, onClose, onCreated }) {
           </div>
           <div className="space-y-2">
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Прокси-ссылки</div>
-            {results.nodes.map(({ node, ok, data, error }) => {
+            {dedupeByUrl(results.nodes).map(({ node, ok, data, error }) => {
               if (!ok) return (
                 <div key={node.id} className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/30 rounded-xl text-xs text-red-300">
                   <AlertTriangle size={12} className="flex-shrink-0" />
@@ -337,7 +348,7 @@ function UserDetailModal({ nodes, activeNode, username, onClose }) {
               Прокси-ссылки по нодам
             </div>
             <div className="space-y-2">
-              {nodeResults.map(({ node, ok, data, error }) => (
+              {dedupeByUrl(nodeResults).map(({ node, ok, data, error }) => (
                 ok ? (
                   <NodeLinksBlock key={node.id} nodeName={node.name} links={data?.links} />
                 ) : (
@@ -590,9 +601,21 @@ export default function Users() {
   }
 
   const filtered = users.filter(u => u.username?.toLowerCase().includes(search.toLowerCase()))
+  const uniqueNodeUrls = new Set(nodes.map(n => n.url))
+  const hasDuplicateNodes = nodes.length > 1 && uniqueNodeUrls.size < nodes.length
 
   return (
     <div className="space-y-5">
+      {hasDuplicateNodes && (
+        <div className="flex items-start gap-3 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded-xl text-xs text-yellow-300">
+          <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-medium">Несколько нод указывают на один сервер</span>
+            {' '}— ссылки для одного пользователя будут одинаковыми (это нормально).
+            Если разные пользователи показывают одну и ту же ссылку — нажмите «Синхронизировать».
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Пользователи</h1>
