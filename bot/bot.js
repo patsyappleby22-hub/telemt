@@ -39,12 +39,15 @@ function api(path, opts = {}) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function loadToken() {
+  if (process.env.BOT_TOKEN) return process.env.BOT_TOKEN
   const s = await api('/settings').catch(() => null)
   return s?.bot_token && s.bot_token !== '***' ? s.bot_token : ''
 }
 
 async function getSettings() {
-  return await api('/settings').catch(() => ({}))
+  const s = await api('/settings').catch(() => ({}))
+  if (process.env.BOT_TOKEN && s && !s.bot_token) s.bot_token = process.env.BOT_TOKEN
+  return s || {}
 }
 
 async function getPlans() {

@@ -526,16 +526,24 @@ router.delete('/bot/plans/:id', async (req, res) => {
 })
 
 router.get('/bot/settings', async (req, res) => {
-  const s = await loadBotSettings()
-  res.json({ ...s, bot_token: s.bot_token ? '***' : '' })
+  try {
+    const s = await loadBotSettings()
+    res.json({ ...s, bot_token: s.bot_token ? '***' : '' })
+  } catch {
+    res.json({ bot_token: '', bot_name: 'Telemt Proxy', welcome_text: '', features: '', support_link: '', about_text: '', ref_bonus_days: 3, trial_days: 1, required_channel: '' })
+  }
 })
 
 router.patch('/bot/settings', parseJson, async (req, res) => {
-  const cur = await loadBotSettings()
-  const update = { ...req.body }
-  if (update.bot_token === '***') delete update.bot_token
-  await saveBotSettings({ ...cur, ...update })
-  res.json({ ok: true })
+  try {
+    const cur = await loadBotSettings().catch(() => ({}))
+    const update = { ...req.body }
+    if (update.bot_token === '***') delete update.bot_token
+    await saveBotSettings({ ...cur, ...update })
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: 'Database unavailable: ' + e.message })
+  }
 })
 
 router.get('/bot/users', async (req, res) => { res.json(await loadBotUsers()) })
