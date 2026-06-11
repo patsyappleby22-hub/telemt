@@ -5,6 +5,11 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import crypto from 'crypto'
+import {
+  loadBotUsers, saveBotUsers, loadPlans, savePlans,
+  loadBotSettings, saveBotSettings, loadPayments, savePayments,
+  upsertBotUser, getBotUser, generateProxyUsername, generateSecret
+} from './bot-db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const NODES_FILE = join(__dirname, 'nodes.json')
@@ -615,6 +620,207 @@ app.use('/nodes/:id/api', (req, res) => {
   })
 
   req.pipe(proxyReq)
+})
+
+// ============================================================
+// BOT API ROUTES
+// ============================================================
+
+// --- Plans ---
+app.get('/bot/plans', (req, res) => {
+  res.json(loadPlans())
+})
+
+app.post('/bot/plans', parseJson, (req, res) => {
+  const plans = req.body
+  if (!Array.isArray(plans)) return res.status(400).json({ error: 'Array expected' })
+  savePlans(plans)
+  res.json({ ok: true })
+})
+
+app.patch('/bot/plans/:id', parseJson, (req, res) => {
+  const plans = loadPlans()
+  const idx = plans.findIndex(p => p.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'Not found' })
+  plans[idx] = { ...plans[idx], ...req.body }
+  savePlans(plans)
+  res.json(plans[idx])
+})
+
+app.delete('/bot/plans/:id', (req, res) => {
+  const plans = loadPlans()
+  savePlans(plans.filter(p => p.id !== req.params.id))
+  res.json({ ok: true })
+})
+
+// --- Bot Settings ---
+app.get('/bot/settings', (req, res) => {
+  const s = loadBotSettings()
+  res.json({ ...s, bot_token: s.bot_token ? '***' : '' })
+})
+
+app.patch('/bot/settings', parseJson, (req, res) => {
+  const cur = loadBotSettings()
+  const update = { ...req.body }
+  if (update.bot_token === '***') delete update.bot_token
+  saveBotSettings({ ...cur, ...update })
+  res.json({ ok: true })
+})
+
+// --- Bot Users ---
+app.get('/bot/users', (req, res) => {
+  const users = loadBotUsers()
+  res.json(users)
+})
+
+app.get('/bot/users/:telegram_id', (req, res) => {
+  const u = getBotUser(Number(req.params.telegram_id))
+  if (!u) return res.status(404).json({ error: 'Not found' })
+  res.json(u)
+})
+
+app.patch('/bot/users/:telegram_id', parseJson, (req, res) => {
+  const u = upsertBotUser(Number(req.params.telegram_id), req.body)
+  res.json(u)
+})
+
+app.delete('/bot/users/:telegram_id', (req, res) => {
+  const users = loadBotUsers()
+  saveBotUsers(users.filter(u => u.telegram_id !== Number(req.params.telegram_id)))
+  res.json({ ok: true })
+})
+
+// --- Payments ---
+app.get('/bot/payments', (req, res) => {
+  const payments = loadPayments()
+  res.json(payments)
+})
+
+app.post('/bot/payments', parseJson, (req, res) => {
+  const payments = loadPayments()
+  const p = { id: crypto.randomUUID(), ...req.body, created_at: Date.now() }
+  payments.push(p)
+  savePayments(payments)
+  res.json(p)
+})
+
+// --- Bot stats summary ---
+app.get('/bot/stats', (req, res) => {
+  const users = loadBotUsers()
+  const payments = loadPayments()
+  const now = Date.now()
+  const active = users.filter(u => u.subscription_until && u.subscription_until > now).length
+  const total = users.length
+  const revenue = payments.filter(p => p.status === 'paid').reduce((s, p) => s + (p.amount || 0), 0)
+  const today = payments.filter(p => p.status === 'paid' && p.created_at > now - 86400000).reduce((s, p) => s + (p.amount || 0), 0)
+  res.json({ total_users: total, active_subscriptions: active, total_revenue: revenue, today_revenue: today })
+})
+
+// --- Bot subscription management (activate/deactivate) ---
+app.post('/bot/users/:telegram_id/activate', parseJson, async (req, res) => {
+  const telegramId = Number(req.params.telegram_id)
+  const { plan_id } = req.body
+  const plans = loadPlans()
+  const plan = plans.find(p => p.id === plan_id)
+  if (!plan) return res.status(400).json({ error: 'Plan not found' })
+
+  const user = getBotUser(telegramId)
+  const username = generateProxyUsername(telegramId)
+  const secret = (user && user.proxy_secret) || generateSecret()
+
+  const now = Date.now()
+  const currentUntil = (user && user.subscription_until && user.subscription_until > now)
+    ? user.subscription_until : now
+  const newUntil = currentUntil + plan.days * 86400000
+  const expirationRfc = new Date(newUntil).toISOString()
+
+  // Sync to all nodes
+  const currentNodes = loadNodes()
+  for (const node of currentNodes) {
+    const body = {
+      username,
+      secret,
+      enabled: true,
+      expiration_rfc3339: expirationRfc
+    }
+    const r = await nodeApiRequest(node, 'POST', '/v1/users', body)
+    if (!r.ok) {
+      await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
+    }
+  }
+
+  // Save to central users registry too
+  const regUsers = loadUsers()
+  const regIdx = regUsers.findIndex(u => u.username === username)
+  const regEntry = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
+  if (regIdx >= 0) regUsers[regIdx] = { ...regUsers[regIdx], ...regEntry }
+  else regUsers.push(regEntry)
+  saveUsers(regUsers)
+
+  const updated = upsertBotUser(telegramId, {
+    proxy_username: username,
+    proxy_secret: secret,
+    subscription_until: newUntil,
+    subscription_plan: plan_id,
+    has_access: true
+  })
+  res.json(updated)
+})
+
+app.post('/bot/users/:telegram_id/deactivate', async (req, res) => {
+  const telegramId = Number(req.params.telegram_id)
+  const username = generateProxyUsername(telegramId)
+
+  const currentNodes = loadNodes()
+  for (const node of currentNodes) {
+    await nodeApiRequest(node, 'PATCH', `/v1/users/${encodeURIComponent(username)}`, { enabled: false })
+  }
+
+  const regUsers = loadUsers()
+  const regIdx = regUsers.findIndex(u => u.username === username)
+  if (regIdx >= 0) { regUsers[regIdx].enabled = false; saveUsers(regUsers) }
+
+  const updated = upsertBotUser(telegramId, { has_access: false })
+  res.json(updated)
+})
+
+// --- Trial ---
+app.post('/bot/users/:telegram_id/trial', async (req, res) => {
+  const telegramId = Number(req.params.telegram_id)
+  const user = getBotUser(telegramId)
+  if (user && user.trial_used) return res.status(400).json({ error: 'Trial already used' })
+
+  const settings = loadBotSettings()
+  const trialDays = settings.trial_days || 1
+  const username = generateProxyUsername(telegramId)
+  const secret = generateSecret()
+  const newUntil = Date.now() + trialDays * 86400000
+  const expirationRfc = new Date(newUntil).toISOString()
+
+  const currentNodes = loadNodes()
+  for (const node of currentNodes) {
+    const body = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
+    const r = await nodeApiRequest(node, 'POST', '/v1/users', body)
+    if (!r.ok) {
+      await nodeApiRequest(node, 'POST', `/v1/users/${encodeURIComponent(username)}/rotate-secret`, { secret })
+    }
+  }
+
+  const regUsers = loadUsers()
+  const regIdx = regUsers.findIndex(u => u.username === username)
+  const regEntry = { username, secret, enabled: true, expiration_rfc3339: expirationRfc }
+  if (regIdx >= 0) regUsers[regIdx] = { ...regUsers[regIdx], ...regEntry }
+  else regUsers.push(regEntry)
+  saveUsers(regUsers)
+
+  const updated = upsertBotUser(telegramId, {
+    proxy_username: username,
+    proxy_secret: secret,
+    subscription_until: newUntil,
+    has_access: true,
+    trial_used: true
+  })
+  res.json(updated)
 })
 
 const PORT = 9092

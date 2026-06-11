@@ -6,6 +6,7 @@ import Users from './pages/Users'
 import Stats from './pages/Stats'
 import Security from './pages/Security'
 import Nodes from './pages/Nodes'
+import Bot from './pages/Bot'
 import { ToastProvider } from './components/Toast'
 import { NodeProvider } from './NodeContext'
 
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="stats" element={<Stats />} />
             <Route path="security" element={<Security />} />
             <Route path="nodes" element={<Nodes />} />
+            <Route path="bot" element={<Bot />} />
           </Route>
         </Routes>
       </NodeProvider>

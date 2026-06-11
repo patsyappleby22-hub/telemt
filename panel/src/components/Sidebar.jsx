@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Users, BarChart2, Shield, Radio, Server, ChevronDown, Check, Plus } from 'lucide-react'
+import { LayoutDashboard, Users, BarChart2, Shield, Radio, Server, Bot, ChevronDown, Check, Plus } from 'lucide-react'
 import { useNode } from '../NodeContext'
 
 const links = [
@@ -9,6 +9,7 @@ const links = [
   { to: '/stats', icon: BarChart2, label: 'Статистика' },
   { to: '/security', icon: Shield, label: 'Безопасность' },
   { to: '/nodes', icon: Server, label: 'Ноды' },
+  { to: '/bot', icon: Bot, label: 'Бот' },
 ]
 
 function NodePicker() {
