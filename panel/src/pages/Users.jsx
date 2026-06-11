@@ -459,7 +459,7 @@ export default function Users() {
                   <th className="px-4 py-3 font-medium">Пользователь</th>
                   <th className="px-4 py-3 font-medium">Статус</th>
                   <th className="px-4 py-3 font-medium">Соед.</th>
-                  <th className="px-4 py-3 font-medium">IP</th>
+                  <th className="px-4 py-3 font-medium">Уник. IP</th>
                   <th className="px-4 py-3 font-medium">Трафик</th>
                   <th className="px-4 py-3 font-medium">Квота</th>
                   <th className="px-4 py-3 font-medium">Скорость ↑/↓</th>
