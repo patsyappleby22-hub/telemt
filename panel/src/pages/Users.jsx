@@ -301,7 +301,7 @@ export default function Users() {
     if (showRefresh) setRefreshing(true)
     try {
       const res = await api.statsUsers()
-      setUsers(res.data?.users || [])
+      setUsers(Array.isArray(res.data) ? res.data : (res.data?.users || []))
     } catch (e) {
       if (showRefresh) toast('Ошибка загрузки: ' + e.message, 'error')
     } finally {
