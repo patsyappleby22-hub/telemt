@@ -100,77 +100,116 @@ function UserActionsMenu({ user, onAction }) {
   )
 }
 
-function CreateUserModal({ api, onClose, onCreated }) {
+function generateSecret() {
+  const arr = new Uint8Array(16)
+  crypto.getRandomValues(arr)
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+function NodeLinksBlock({ nodeName, links }) {
+  const allLinks = [
+    ...filterValidLinks(links?.tls).map(l => ['TLS', l]),
+    ...filterValidLinks(links?.secure).map(l => ['Secure', l]),
+    ...filterValidLinks(links?.classic).map(l => ['Classic', l]),
+  ]
+  const allRaw = [...(links?.tls || []), ...(links?.secure || []), ...(links?.classic || [])]
+  const hasPrivate = hasPrivateLinks(allRaw)
+  if (allLinks.length === 0 && !hasPrivate) return null
+  return (
+    <div className="border border-dark-600 rounded-xl overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-dark-700/60 border-b border-dark-600">
+        <Server size={12} className="text-gray-500" />
+        <span className="text-xs font-medium text-gray-300">{nodeName}</span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5">
+        {hasPrivate && (
+          <div className="flex items-start gap-2 p-2 bg-yellow-900/20 border border-yellow-700/30 rounded-lg text-xs text-yellow-300">
+            <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+            <span>Приватный IP — настройте <code className="font-mono">public_host</code> в config.toml</span>
+          </div>
+        )}
+        {allLinks.map(([type, l], i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 w-12 flex-shrink-0">{type}</span>
+            <code className="flex-1 text-xs font-mono bg-dark-900 px-2 py-1.5 rounded text-gray-300 break-all">{l}</code>
+            <CopyButton text={l} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function CreateUserModal({ nodes, onClose, onCreated }) {
   const [form, setForm] = useState({ username: '', secret: '', user_ad_tag: '', max_tcp_conns: '', data_quota_bytes: '', rate_limit_up_bps: '', rate_limit_down_bps: '', max_unique_ips: '', expiration_rfc3339: '', enabled: true })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [result, setResult] = useState(null)
+  const [results, setResults] = useState(null)
   const toast = useToast()
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const submit = async () => {
     if (!form.username.trim()) { setError('Введите имя пользователя'); return }
+    if (nodes.length === 0) { setError('Нет доступных нод — добавьте ноду в разделе «Ноды»'); return }
     setLoading(true); setError(null)
-    try {
-      const body = { username: form.username.trim(), enabled: form.enabled }
-      if (form.secret) body.secret = form.secret
-      if (form.user_ad_tag) body.user_ad_tag = form.user_ad_tag
-      if (form.max_tcp_conns) body.max_tcp_conns = parseInt(form.max_tcp_conns)
-      if (form.data_quota_bytes) body.data_quota_bytes = parseInt(form.data_quota_bytes)
-      if (form.rate_limit_up_bps) body.rate_limit_up_bps = parseInt(form.rate_limit_up_bps)
-      if (form.rate_limit_down_bps) body.rate_limit_down_bps = parseInt(form.rate_limit_down_bps)
-      if (form.max_unique_ips) body.max_unique_ips = parseInt(form.max_unique_ips)
-      if (form.expiration_rfc3339) body.expiration_rfc3339 = form.expiration_rfc3339
-      const res = await api.createUser(body)
-      setResult(res.data)
-      toast('Пользователь создан!', 'success')
+
+    const sharedSecret = form.secret.trim() || generateSecret()
+
+    const body = { username: form.username.trim(), enabled: form.enabled, secret: sharedSecret }
+    if (form.user_ad_tag) body.user_ad_tag = form.user_ad_tag
+    if (form.max_tcp_conns) body.max_tcp_conns = parseInt(form.max_tcp_conns)
+    if (form.data_quota_bytes) body.data_quota_bytes = parseInt(form.data_quota_bytes)
+    if (form.rate_limit_up_bps) body.rate_limit_up_bps = parseInt(form.rate_limit_up_bps)
+    if (form.rate_limit_down_bps) body.rate_limit_down_bps = parseInt(form.rate_limit_down_bps)
+    if (form.max_unique_ips) body.max_unique_ips = parseInt(form.max_unique_ips)
+    if (form.expiration_rfc3339) body.expiration_rfc3339 = form.expiration_rfc3339
+
+    const settled = await Promise.allSettled(
+      nodes.map(node => makeApi(node.id).createUser(body).then(res => ({ node, data: res.data })))
+    )
+
+    const nodeResults = settled.map((r, i) => ({
+      node: nodes[i],
+      ok: r.status === 'fulfilled',
+      data: r.status === 'fulfilled' ? r.value.data : null,
+      error: r.status === 'rejected' ? r.reason?.message : null,
+    }))
+
+    const successCount = nodeResults.filter(r => r.ok).length
+    if (successCount > 0) {
+      setResults({ secret: sharedSecret, nodes: nodeResults })
+      toast(`Пользователь создан на ${successCount} из ${nodes.length} нод`, successCount === nodes.length ? 'success' : 'warning')
       onCreated()
-    } catch (e) { setError(e.message) }
-    finally { setLoading(false) }
+    } else {
+      setError('Не удалось создать пользователя ни на одной ноде: ' + nodeResults[0]?.error)
+    }
+    setLoading(false)
   }
 
-  if (result) {
+  if (results) {
     return (
-      <Modal title="Пользователь создан" onClose={onClose}>
+      <Modal title="Пользователь создан" onClose={onClose} size="lg">
         <div className="space-y-4">
           <div className="p-4 bg-green-900/20 border border-green-700/40 rounded-xl">
-            <div className="text-sm font-medium text-green-300 mb-3">Сохраните секрет — он показывается только один раз!</div>
+            <div className="text-sm font-medium text-green-300 mb-3">Общий секрет для всех нод — сохраните!</div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 font-mono text-sm bg-dark-900 px-3 py-2 rounded-lg text-yellow-300 border border-dark-600 break-all">{result.secret}</code>
-              <CopyButton text={result.secret} />
+              <code className="flex-1 font-mono text-sm bg-dark-900 px-3 py-2 rounded-lg text-yellow-300 border border-dark-600 break-all">{results.secret}</code>
+              <CopyButton text={results.secret} />
             </div>
           </div>
-          {(() => {
-            const allLinks = [
-              ...filterValidLinks(result.user?.links?.tls).map(l => ['TLS', l]),
-              ...filterValidLinks(result.user?.links?.secure).map(l => ['Secure', l]),
-              ...filterValidLinks(result.user?.links?.classic).map(l => ['Classic', l]),
-            ]
-            const hasPrivate = hasPrivateLinks([
-              ...(result.user?.links?.tls || []),
-              ...(result.user?.links?.secure || []),
-              ...(result.user?.links?.classic || []),
-            ])
-            if (allLinks.length === 0 && !hasPrivate) return null
-            return (
-              <div>
-                <div className="text-xs text-gray-500 mb-2">Ссылки для подключения</div>
-                {hasPrivate && (
-                  <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
-                    <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
-                    <span>Обнаружен приватный IP — ссылки не будут работать из интернета. Нажмите «Обновить» в разделе Ноды, или добавьте в <code className="font-mono">config.toml</code>: <code className="font-mono">[general.links]</code> → <code className="font-mono">public_host = "ВАШ_IP"</code></span>
-                  </div>
-                )}
-                {allLinks.map(([type, l], i) => (
-                  <div key={i} className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-gray-500 w-12 flex-shrink-0">{type}</span>
-                    <code className="flex-1 text-xs font-mono bg-dark-700 px-2 py-1.5 rounded text-gray-300 break-all">{l}</code>
-                    <CopyButton text={l} />
-                  </div>
-                ))}
-              </div>
-            )
-          })()}
+          <div className="space-y-2">
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">Прокси-ссылки по нодам</div>
+            {results.nodes.map(({ node, ok, data, error }) => (
+              ok ? (
+                <NodeLinksBlock key={node.id} nodeName={node.name} links={data?.user?.links} />
+              ) : (
+                <div key={node.id} className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/30 rounded-xl text-xs text-red-300">
+                  <AlertTriangle size={12} className="flex-shrink-0" />
+                  <span><b>{node.name}</b>: {error}</span>
+                </div>
+              )
+            ))}
+          </div>
           <button onClick={onClose} className="btn-primary w-full justify-center">Закрыть</button>
         </div>
       </Modal>
@@ -180,6 +219,12 @@ function CreateUserModal({ api, onClose, onCreated }) {
   return (
     <Modal title="Создать пользователя" onClose={onClose} size="lg">
       <div className="space-y-4">
+        {nodes.length > 1 && (
+          <div className="flex items-center gap-2 p-3 bg-blue-950/30 border border-blue-700/30 rounded-lg text-xs text-blue-300">
+            <Server size={13} className="flex-shrink-0" />
+            Пользователь будет создан на всех {nodes.length} нодах с одинаковым токеном
+          </div>
+        )}
         {error && <div className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/40 rounded-lg text-sm text-red-300"><AlertTriangle size={14} /> {error}</div>}
         <div className="grid grid-cols-2 gap-4">
           <div><label className="block text-xs text-gray-500 mb-1.5 font-medium">Имя пользователя *</label><input className="input" placeholder="alice" value={form.username} onChange={e => set('username', e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} /></div>
@@ -202,20 +247,32 @@ function CreateUserModal({ api, onClose, onCreated }) {
   )
 }
 
-function UserDetailModal({ api, username, onClose }) {
-  const [user, setUser] = useState(null)
+function UserDetailModal({ nodes, activeNode, username, onClose }) {
+  const [primaryUser, setPrimaryUser] = useState(null)
+  const [nodeResults, setNodeResults] = useState([])
   const [loading, setLoading] = useState(true)
-  const [copied, setCopied] = useState({})
 
   useEffect(() => {
-    api.getUser(username).then(r => { setUser(r.data); setLoading(false) }).catch(() => setLoading(false))
+    const fetchAll = async () => {
+      setLoading(true)
+      const settled = await Promise.allSettled(
+        nodes.map(node => makeApi(node.id).getUser(username).then(r => ({ node, data: r.data })))
+      )
+      const results = settled.map((r, i) => ({
+        node: nodes[i],
+        ok: r.status === 'fulfilled',
+        data: r.status === 'fulfilled' ? r.value.data : null,
+        error: r.status === 'rejected' ? r.reason?.message : null,
+      }))
+      setNodeResults(results)
+      const primary = results.find(r => r.ok && r.node.id === activeNode?.id) || results.find(r => r.ok)
+      if (primary) setPrimaryUser(primary.data)
+      setLoading(false)
+    }
+    fetchAll()
   }, [username])
 
-  const copy = async (text, key) => {
-    await navigator.clipboard.writeText(text)
-    setCopied(p => ({ ...p, [key]: true }))
-    setTimeout(() => setCopied(p => ({ ...p, [key]: false })), 1500)
-  }
+  const user = primaryUser
 
   return (
     <Modal title={`Пользователь: ${username}`} onClose={onClose} size="xl">
@@ -253,38 +310,23 @@ function UserDetailModal({ api, username, onClose }) {
               </div>
             </div>
           )}
-          {(() => {
-            const allLinks = [
-              ...filterValidLinks(user.links?.tls).map(l => ['TLS', l]),
-              ...filterValidLinks(user.links?.secure).map(l => ['Secure', l]),
-              ...filterValidLinks(user.links?.classic).map(l => ['Classic', l]),
-            ]
-            const allRaw = [...(user.links?.tls || []), ...(user.links?.secure || []), ...(user.links?.classic || [])]
-            const hasPrivate = hasPrivateLinks(allRaw)
-            if (allLinks.length === 0 && !hasPrivate) return null
-            return (
-              <div>
-                <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">Ссылки для подключения</div>
-                {hasPrivate && (
-                  <div className="flex items-start gap-2 p-2.5 bg-yellow-900/20 border border-yellow-700/30 rounded-lg mb-2 text-xs text-yellow-300">
-                    <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
-                    <span>Приватный IP — ссылки не работают из интернета. Нажмите «Обновить» в разделе Ноды, или в <code className="font-mono">config.toml</code> добавьте: <code className="font-mono">[general.links]</code> → <code className="font-mono">public_host = "ВАШ_IP"</code></span>
+          <div>
+            <div className="text-xs font-medium text-gray-500 mb-2 uppercase tracking-wider">
+              Прокси-ссылки по нодам
+            </div>
+            <div className="space-y-2">
+              {nodeResults.map(({ node, ok, data, error }) => (
+                ok ? (
+                  <NodeLinksBlock key={node.id} nodeName={node.name} links={data?.links} />
+                ) : (
+                  <div key={node.id} className="flex items-center gap-2 p-3 bg-red-900/20 border border-red-700/30 rounded-xl text-xs text-red-300">
+                    <AlertTriangle size={12} className="flex-shrink-0" />
+                    <span><b>{node.name}</b>: {error || 'нода недоступна'}</span>
                   </div>
-                )}
-                <div className="space-y-2">
-                  {allLinks.map(([type, link], i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-12 flex-shrink-0">{type}</span>
-                      <code className="flex-1 text-xs font-mono bg-dark-700 px-2 py-1.5 rounded text-blue-300 break-all">{link}</code>
-                      <button onClick={() => copy(link, i)} className="text-gray-500 hover:text-gray-200 flex-shrink-0">
-                        {copied[i] ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
+                )
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <div className="text-center py-8 text-gray-600">Ошибка загрузки</div>
@@ -364,7 +406,7 @@ function ConfirmModal({ title, message, onConfirm, onClose, danger }) {
 }
 
 export default function Users() {
-  const { activeNode } = useNode()
+  const { activeNode, nodes } = useNode()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -438,7 +480,7 @@ export default function Users() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Пользователи</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{activeNode.name} · {users.length} пользователей</p>
+          <p className="text-sm text-gray-500 mt-0.5">{activeNode.name} · {users.length} пользователей{nodes.length > 1 ? ` · ${nodes.length} нод` : ''}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => load(true)} disabled={refreshing} className="btn-ghost">
@@ -507,8 +549,8 @@ export default function Users() {
         )}
       </div>
 
-      {modal?.type === 'create' && <CreateUserModal api={api} onClose={() => setModal(null)} onCreated={load} />}
-      {modal?.type === 'view' && <UserDetailModal api={api} username={modal.username} onClose={() => setModal(null)} />}
+      {modal?.type === 'create' && <CreateUserModal nodes={nodes} onClose={() => setModal(null)} onCreated={load} />}
+      {modal?.type === 'view' && <UserDetailModal nodes={nodes} activeNode={activeNode} username={modal.username} onClose={() => setModal(null)} />}
       {modal?.type === 'rotate' && <RotateSecretModal api={api} username={modal.username} onClose={() => setModal(null)} onDone={load} />}
       {modal?.type === 'confirm' && <ConfirmModal title={modal.title} message={modal.message} danger={modal.danger} onConfirm={modal.onConfirm} onClose={() => setModal(null)} />}
     </div>
