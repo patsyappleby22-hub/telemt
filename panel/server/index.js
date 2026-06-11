@@ -65,7 +65,7 @@ function nodeApiRequest(node, method, path, body) {
 async function syncUsersToNode(node) {
   const users = loadUsers()
   if (users.length === 0) return
-  let ok = 0, fail = 0
+  let created = 0, updated = 0, fail = 0
   for (const user of users) {
     const body = { username: user.username, secret: user.secret, enabled: user.enabled !== false }
     if (user.max_tcp_conns) body.max_tcp_conns = user.max_tcp_conns
@@ -76,9 +76,23 @@ async function syncUsersToNode(node) {
     if (user.expiration_rfc3339) body.expiration_rfc3339 = user.expiration_rfc3339
     if (user.user_ad_tag) body.user_ad_tag = user.user_ad_tag
     const res = await nodeApiRequest(node, 'POST', '/v1/users', body)
-    res.ok ? ok++ : fail++
+    if (res.ok) {
+      created++
+    } else {
+      // If user already exists — force rotate secret to match registry
+      const isConflict = res.status === 409 || res.status === 422 ||
+        (res.body && (res.body.includes('exist') || res.body.includes('conflict')))
+      if (isConflict) {
+        const rotRes = await nodeApiRequest(node, 'POST',
+          `/v1/users/${encodeURIComponent(user.username)}/rotate-secret`,
+          { secret: user.secret })
+        rotRes.ok ? updated++ : fail++
+      } else {
+        fail++
+      }
+    }
   }
-  console.log(`[sync] Node "${node.name}": ${ok} pushed, ${fail} failed (${users.length} total)`)
+  console.log(`[sync] Node "${node.name}": ${created} created, ${updated} secret-updated, ${fail} failed (${users.length} total)`)
 }
 
 let nodes = loadNodes()
