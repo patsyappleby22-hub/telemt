@@ -37,6 +37,11 @@ function api(path, opts = {}) {
   return apiCall(path, newOpts)
 }
 
+// ─── HTML escape ──────────────────────────────────────────────────────────────
+function esc(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function loadToken() {
   if (process.env.BOT_TOKEN) return process.env.BOT_TOKEN
@@ -86,7 +91,7 @@ async function isSubscribedToChannel(bot, userId, channelUsername) {
 
 function buildLinksKeyboard(links) {
   if (!links || links.length === 0) return []
-  return links.map((link, i) => [{ text: `🔌 Подключить (сервер ${i + 1})`, url: link }])
+  return links.map((link, i) => [{ text: `⚡️ Подключить${links.length > 1 ? ` · Сервер ${i + 1}` : ''}`, url: link }])
 }
 
 function mergeKeyboard(linkRows, actionRows) {
@@ -116,26 +121,26 @@ async function handleReferral(userId, referrerId) {
 function mainMenuInlineKeyboard() {
   return {
     inline_keyboard: [
-      [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
-      [{ text: '🔐 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
+      [{ text: '🛡 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
+      [{ text: '🔑 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
       [{ text: '💬 Поддержка', callback_data: 'support' }, { text: '📖 О нас', callback_data: 'about' }],
-      [{ text: '👥 Рефералы', callback_data: 'referral' }, { text: '💰 Пополнить баланс', callback_data: 'topup' }],
+      [{ text: '👥 Реферальная программа', callback_data: 'referral' }, { text: '💰 Пополнить баланс', callback_data: 'topup' }],
     ]
   }
 }
 
 function plansKeyboard(plans) {
-  const rows = plans.map(p => [{ text: `📅 ${p.label} — ${p.price} ₽`, callback_data: `buy_${p.id}` }])
+  const rows = plans.map(p => [{ text: `💎 ${p.label} — ${p.price} ₽`, callback_data: `buy_${p.id}` }])
   rows.push([{ text: '🏠 Главное меню', callback_data: 'main_menu' }])
   return { inline_keyboard: rows }
 }
 
-// ─── Message tracking: edit first, send if needed ────────────────────────────
-// userId → { chatId, msgId }
-const lastMsg = new Map()
+function backKeyboard(cb = 'main_menu', label = '← Назад') {
+  return { inline_keyboard: [[{ text: label, callback_data: cb }]] }
+}
 
-// ─── Pending trial: users who need to subscribe before getting trial ──────────
-// userId → { chatId, msgId } — kept in memory, cleared on grant or restart
+// ─── Message tracking: edit first, send if needed ────────────────────────────
+const lastMsg = new Map()
 const pendingTrial = new Map()
 
 async function showScreen(bot, chatId, userId, text, opts = {}) {
@@ -154,7 +159,6 @@ async function showScreen(bot, chatId, userId, text, opts = {}) {
   return r?.result
 }
 
-// For callback queries: edit in-place, fall back to new message if edit fails
 async function editScreen(bot, query, text, opts = {}) {
   const chatId = query.message.chat.id
   const msgId = query.message.message_id
@@ -166,13 +170,11 @@ async function editScreen(bot, query, text, opts = {}) {
       lastMsg.set(userId, { chatId, msgId })
       return r.result
     }
-    // Telegram returned ok:false — log and fall through to send
     console.warn(`[bot] editMessageText failed: ${JSON.stringify(r?.description || r)}`)
   } catch (e) {
     console.warn('[bot] editMessageText error:', e.message)
   }
 
-  // Fallback: send a fresh message
   try {
     const sent = await bot.sendMessage(chatId, text, opts)
     if (sent && sent.ok && sent.result) {
@@ -185,32 +187,39 @@ async function editScreen(bot, query, text, opts = {}) {
 }
 
 // ─── Screen builders ──────────────────────────────────────────────────────────
-async function buildMainMenuText(settings) {
-  const name = settings.bot_name || 'Telemt Proxy'
-  const welcome = settings.welcome_text || 'Быстрый и надёжный MTProxy'
+function buildMainMenuText(settings) {
+  const name = esc(settings.bot_name || 'Telemt Proxy')
+  const welcome = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
   const features = settings.features || ''
-  return `🚀 *${name}* — ${welcome}\n\n${features ? features + '\n\n' : ''}Выберите нужное действие:`
+
+  let text = `⚡️ <b>${name}</b>\n`
+  text += `<i>${welcome}</i>\n`
+
+  if (features) {
+    const lines = features.split('\n').filter(Boolean)
+    const formatted = lines.map(l => {
+      const m = l.match(/^[-–—•*]\s*(.+)/)
+      if (m) {
+        const parts = m[1].split(' - ')
+        if (parts.length >= 2) return `— <b>${esc(parts[0].trim())}</b> · ${esc(parts.slice(1).join(' - ').trim())}`
+        return `— ${esc(m[1])}`
+      }
+      return esc(l)
+    }).join('\n')
+    text += `\n<blockquote>${formatted}</blockquote>\n`
+  }
+
+  text += `\nВыберите нужное действие:`
+  return text
 }
 
-async function buildAccessScreen(userId, subscriptionUntil) {
-  const now = Date.now()
-  const links = await getProxyLinks(userId)
-  const linkRows = buildLinksKeyboard(links)
-
-  const until = new Date(subscriptionUntil).toLocaleDateString('ru-RU')
-  const daysLeft = Math.ceil((subscriptionUntil - now) / 86400000)
-
-  const text = links.length > 0
-    ? `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*\n\n🔌 Нажмите кнопку для подключения:`
-    : `🔐 *Ваш доступ*\n\n📅 Активен до: *${until}*\n⏳ Осталось: *${daysLeft} дн.*`
-
-  return {
-    text,
-    reply_markup: mergeKeyboard(linkRows, [
-      [{ text: '🔄 Продлить', callback_data: 'show_plans' }],
-      [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
-    ])
-  }
+function buildAccessText(until, daysLeft, hasLinks) {
+  const badge = daysLeft <= 3 ? '🔴' : daysLeft <= 7 ? '🟡' : '🟢'
+  let text = `🔑 <b>Ваш доступ</b>\n\n`
+  text += `${badge} Активен до: <b>${until}</b>\n`
+  text += `⏳ Осталось: <b>${daysLeft} дн.</b>\n`
+  if (hasLinks) text += `\n<i>Нажмите кнопку ниже для подключения к прокси:</i>`
+  return text
 }
 
 // ─── Bot startup ──────────────────────────────────────────────────────────────
@@ -243,9 +252,9 @@ async function startBot() {
       await handleReferral(msg.from.id, referrerId)
     }
     const s = await getSettings()
-    const text = await buildMainMenuText(s)
+    const text = buildMainMenuText(s)
     const r = await bot.sendMessage(msg.chat.id, text, {
-      parse_mode: 'Markdown',
+      parse_mode: 'HTML',
       reply_markup: mainMenuInlineKeyboard()
     })
     if (r?.ok && r?.result) {
@@ -253,94 +262,95 @@ async function startBot() {
     }
   })
 
-  // ── Callback queries (все редактируют существующее сообщение) ────────────────
+  // ── Callback queries ─────────────────────────────────────────────────────────
   bot.on('callback_query', async (query) => {
-    const msg = query.message
     const userId = query.from.id
     const data = query.data
     await bot.answerCallbackQuery(query.id)
 
+    // ── Главное меню ──────────────────────────────────────────────────────────
     if (data === 'main_menu') {
       const s = await getSettings()
-      const text = await buildMainMenuText(s)
-      await editScreen(bot, query, text, { parse_mode: 'Markdown', reply_markup: mainMenuInlineKeyboard() })
+      await editScreen(bot, query, buildMainMenuText(s), {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuInlineKeyboard()
+      })
       return
     }
 
+    // ── Тарифы ───────────────────────────────────────────────────────────────
     if (data === 'show_plans') {
       const plans = await getPlans()
       if (!plans.length) {
-        await editScreen(bot, query, '❌ Тарифы не настроены.', {
-          reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
-        })
+        await editScreen(bot, query,
+          '⚠️ <b>Тарифы не настроены</b>\n\n<i>Обратитесь к администратору.</i>',
+          { parse_mode: 'HTML', reply_markup: backKeyboard() }
+        )
         return
       }
       const s = await getSettings()
+      const name = esc(s.bot_name || 'Proxy')
       await editScreen(bot, query,
-        `📦 *${s.bot_name || 'Proxy'}*\n\nВыбери срок подписки:`,
-        { parse_mode: 'Markdown', reply_markup: plansKeyboard(plans) }
+        `💎 <b>${name}</b>\n\n<i>Выберите подходящий тарифный план:</i>`,
+        { parse_mode: 'HTML', reply_markup: plansKeyboard(plans) }
       )
       return
     }
 
+    // ── Тестовый доступ / проверка подписки ──────────────────────────────────
     if (data === 'trial' || data === 'check_sub') {
       const user = await getOrCreateUser(query.from)
       const s = await getSettings()
       const trialDays = s.trial_days || 1
       const channel = (s.required_channel || '').trim().replace(/^@/, '')
 
-      // ── 1. Тест уже использован — сообщаем сразу, до всяких проверок ──────────
       if (user.trial_used) {
         await editScreen(bot, query,
-          '⚠️ *Тестовый период уже использован*\n\nОформите подписку, чтобы продолжить пользоваться прокси:',
+          '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку, чтобы продолжить:</i>',
           {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: { inline_keyboard: [
               [{ text: '💳 Купить доступ', callback_data: 'show_plans' }],
-              [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+              [{ text: '← Назад', callback_data: 'main_menu' }]
             ]}
           }
         )
         return
       }
 
-      // ── 2. Проверка подписки на канал ──────────────────────────────────────────
       if (channel) {
         const subscribed = await isSubscribedToChannel(bot, userId, channel)
         if (!subscribed) {
-          // Показываем приглашение подписаться и запоминаем ожидание
           await editScreen(bot, query,
-            `📢 *Для получения тестового доступа*\n\nПодпишитесь на наш канал — это обязательное условие.\n\nПосле подписки нажмите кнопку *«Я подписался»* — доступ выдастся автоматически 🎉\n\n⏱ Тест: ${trialDays} дн.`,
+            `📢 <b>Подпишитесь на канал</b>\n\n<i>Для получения тестового доступа необходимо подписаться на наш канал.</i>\n\nПосле подписки нажмите <b>«✅ Я подписался»</b> — доступ выдастся автоматически.\n\n⏱ Тест: <b>${trialDays} дн.</b>`,
             {
-              parse_mode: 'Markdown',
+              parse_mode: 'HTML',
               reply_markup: { inline_keyboard: [
                 [{ text: `🔔 Подписаться на @${channel}`, url: `https://t.me/${channel}` }],
                 [{ text: '✅ Я подписался', callback_data: 'check_sub' }],
-                [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+                [{ text: '← Назад', callback_data: 'main_menu' }]
               ]}
             }
           )
           pendingTrial.set(userId, { chatId: query.message.chat.id, msgId: query.message.message_id })
           return
         }
-        // Подписан — убираем из ожидания
         pendingTrial.delete(userId)
       }
 
-      // ── 3. Выдаём тест ─────────────────────────────────────────────────────────
       const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
       if (!result || result.error) {
-        const errMsg = result?.error || 'Ошибка'
+        const errMsg = result?.error || 'Неизвестная ошибка'
         const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
         await editScreen(bot, query,
           isUsed
-            ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку:'
-            : `❌ Ошибка: ${errMsg}`,
+            ? '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку:</i>'
+            : `❌ <b>Ошибка</b>\n\n<i>${esc(errMsg)}</i>`,
           {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: { inline_keyboard: [
               [{ text: '💳 Купить доступ', callback_data: 'show_plans' }],
-              [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+              [{ text: '← Назад', callback_data: 'main_menu' }]
             ]}
           }
         )
@@ -351,127 +361,148 @@ async function startBot() {
       const linkRows = buildLinksKeyboard(links)
       await editScreen(bot, query,
         links.length > 0
-          ? `✅ *Тестовый доступ активирован!*\n📅 Срок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения к прокси:`
-          : `✅ *Тестовый доступ активирован!*\n📅 Срок: ${trialDays} дн.\n\n_Ссылки появятся после настройки нод._`,
+          ? `✅ <b>Тестовый доступ активирован!</b>\n\n📅 Срок: <b>${trialDays} дн.</b>\n\n<i>Нажмите кнопку ниже для подключения к прокси:</i>`
+          : `✅ <b>Тестовый доступ активирован!</b>\n\n📅 Срок: <b>${trialDays} дн.</b>\n\n<i>Ссылки для подключения появятся после настройки нод.</i>`,
         {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
         }
       )
       return
     }
 
+    // ── Мой доступ ────────────────────────────────────────────────────────────
     if (data === 'my_access') {
       const user = await getOrCreateUser(query.from)
       const now = Date.now()
       const active = user.subscription_until && user.subscription_until > now
       if (!active) {
         await editScreen(bot, query,
-          '❌ *Нет активного доступа*\n\nОформите подписку или активируйте тестовый период.',
+          '🔒 <b>Нет активного доступа</b>\n\n<i>Оформите подписку или активируйте тестовый период.</i>',
           {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: { inline_keyboard: [
-              [{ text: '🔑 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить', callback_data: 'show_plans' }],
-              [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+              [{ text: '🛡 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить', callback_data: 'show_plans' }],
+              [{ text: '← Назад', callback_data: 'main_menu' }]
             ]}
           }
         )
         return
       }
-      const screen = await buildAccessScreen(userId, user.subscription_until)
-      await editScreen(bot, query, screen.text, { parse_mode: 'Markdown', reply_markup: screen.reply_markup })
+      const links = await getProxyLinks(userId)
+      const linkRows = buildLinksKeyboard(links)
+      const until = new Date(user.subscription_until).toLocaleDateString('ru-RU')
+      const daysLeft = Math.ceil((user.subscription_until - now) / 86400000)
+      await editScreen(bot, query,
+        buildAccessText(until, daysLeft, links.length > 0),
+        {
+          parse_mode: 'HTML',
+          reply_markup: mergeKeyboard(linkRows, [
+            [{ text: '🔄 Продлить', callback_data: 'show_plans' }],
+            [{ text: '← Назад', callback_data: 'main_menu' }]
+          ])
+        }
+      )
       return
     }
 
+    // ── Профиль ───────────────────────────────────────────────────────────────
     if (data === 'profile') {
       const user = await getOrCreateUser(query.from)
       const now = Date.now()
       const active = user.subscription_until && user.subscription_until > now
       const reg = user.created_at ? new Date(user.created_at).toLocaleDateString('ru-RU') : '—'
-      let text = `👤 *Твой профиль*\n\n`
-      text += `🆔 ID: \`${userId}\`\n`
-      if (query.from.username) text += `👤 Username: @${query.from.username}\n`
-      text += `📝 Имя: ${query.from.first_name || '—'}\n`
-      text += `📅 Регистрация: ${reg}\n\n`
-      text += `🔑 Доступ: ${active ? '✅ Активен' : '❌ Нет'}\n`
-      text += `👥 Рефералов: ${user.referral_count || 0}\n`
-      text += `💰 Баланс: ${(user.balance || 0).toFixed(2)} RUB`
+      const name = esc([query.from.first_name, query.from.last_name].filter(Boolean).join(' ') || '—')
+      let text = `👤 <b>Профиль</b>\n\n`
+      text += `<b>ID:</b> <code>${userId}</code>\n`
+      if (query.from.username) text += `<b>Username:</b> @${esc(query.from.username)}\n`
+      text += `<b>Имя:</b> ${name}\n`
+      text += `<b>Регистрация:</b> ${reg}\n\n`
+      text += `<b>Доступ:</b> ${active ? '🟢 Активен' : '🔴 Не активен'}\n`
+      text += `<b>Рефералов:</b> ${user.referral_count || 0}\n`
+      text += `<b>Баланс:</b> ${(user.balance || 0).toFixed(2)} ₽`
       await editScreen(bot, query, text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
+        parse_mode: 'HTML',
+        reply_markup: backKeyboard()
       })
       return
     }
 
+    // ── Реферальная программа ─────────────────────────────────────────────────
     if (data === 'referral') {
       const user = await getOrCreateUser(query.from)
       const s = await getSettings()
       const bonusDays = s.ref_bonus_days || 3
       const refLink = `https://t.me/${me.username}?start=${userId}`
-      let text = `👥 *Реферальная программа*\n\n`
-      text += `🎁 За каждого приглашённого: *+${bonusDays} дн.*\n`
-      text += `👤 Ваших рефералов: *${user.referral_count || 0}*\n\n`
-      text += `🔗 Ваша ссылка:\n\`${refLink}\``
+      let text = `👥 <b>Реферальная программа</b>\n\n`
+      text += `🎁 За каждого приглашённого: <b>+${bonusDays} дн.</b>\n`
+      text += `👤 Ваших рефералов: <b>${user.referral_count || 0}</b>\n\n`
+      text += `🔗 <b>Ваша ссылка:</b>\n<code>${refLink}</code>`
       await editScreen(bot, query, text, {
-        parse_mode: 'Markdown',
+        parse_mode: 'HTML',
         reply_markup: { inline_keyboard: [
           [{ text: '📤 Поделиться', url: `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent('Быстрый MTProxy для Telegram!')}` }],
-          [{ text: '↩️ Назад', callback_data: 'main_menu' }]
+          [{ text: '← Назад', callback_data: 'main_menu' }]
         ]}
       })
       return
     }
 
+    // ── О нас ─────────────────────────────────────────────────────────────────
     if (data === 'about') {
       const s = await getSettings()
+      const aboutText = esc(s.about_text || 'Надёжный MTProxy для Telegram.')
       await editScreen(bot, query,
-        `📖 *О нас*\n\n${s.about_text || 'Надёжный MTProxy для Telegram.'}`,
-        {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
-        }
+        `📖 <b>О нас</b>\n\n${aboutText}`,
+        { parse_mode: 'HTML', reply_markup: backKeyboard() }
       )
       return
     }
 
+    // ── Поддержка ─────────────────────────────────────────────────────────────
     if (data === 'support') {
       const s = await getSettings()
       const link = s.support_link || ''
-      const text = link ? `💬 *Поддержка*\n\nСвяжитесь с нами: ${link}` : '💬 *Поддержка*\n\nОбратитесь к администратору бота.'
+      let text = `💬 <b>Поддержка</b>\n\n`
+      text += link
+        ? `Свяжитесь с нами: ${esc(link)}`
+        : `<i>Обратитесь к администратору бота.</i>`
       await editScreen(bot, query, text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
+        parse_mode: 'HTML',
+        reply_markup: link
+          ? { inline_keyboard: [[{ text: '✉️ Написать', url: link }], [{ text: '← Назад', callback_data: 'main_menu' }]] }
+          : backKeyboard()
       })
       return
     }
 
+    // ── Пополнить баланс ──────────────────────────────────────────────────────
     if (data === 'topup') {
       await editScreen(bot, query,
-        '💰 *Пополнение баланса*\n\nСпособ оплаты будет настроен позже. Обратитесь к администратору.',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'main_menu' }]] }
-        }
+        '💰 <b>Пополнение баланса</b>\n\n<i>Способ оплаты будет настроен позже.\nОбратитесь к администратору.</i>',
+        { parse_mode: 'HTML', reply_markup: backKeyboard() }
       )
       return
     }
 
+    // ── Покупка тарифа ────────────────────────────────────────────────────────
     if (data.startsWith('buy_')) {
       const planId = data.replace('buy_', '')
       const plans = await getPlans()
       const plan = plans.find(p => p.id === planId)
       if (!plan) {
-        await editScreen(bot, query, '❌ Тариф не найден.', {
-          reply_markup: { inline_keyboard: [[{ text: '↩️ Назад', callback_data: 'show_plans' }]] }
+        await editScreen(bot, query, '❌ <b>Тариф не найден.</b>', {
+          parse_mode: 'HTML',
+          reply_markup: backKeyboard('show_plans', '← К тарифам')
         })
         return
       }
       await editScreen(bot, query,
-        `💳 *Оплата подписки*\n\n📋 Тариф: *${plan.label}*\n💰 Сумма: *${plan.price} ₽*\n\n⚙️ Способ оплаты будет добавлен позже.\nОбратитесь к администратору.`,
+        `💳 <b>Оформление подписки</b>\n\n📋 Тариф: <b>${esc(plan.label)}</b>\n💰 Сумма: <b>${plan.price} ₽</b>\n\n<i>Способ оплаты будет добавлен позже.\nОбратитесь к администратору.</i>`,
         {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: { inline_keyboard: [
-            [{ text: '↩️ К тарифам', callback_data: 'show_plans' }],
+            [{ text: '← К тарифам', callback_data: 'show_plans' }],
             [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
           ]}
         }
@@ -488,7 +519,6 @@ async function startBot() {
       const user = update.new_chat_member?.user
       if (!user || user.is_bot) return
 
-      // Only react when user becomes a member (joins)
       const joined = ['member', 'administrator', 'creator'].includes(newStatus) &&
         !['member', 'administrator', 'creator'].includes(oldStatus)
       if (!joined) return
@@ -508,10 +538,10 @@ async function startBot() {
         const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
         await bot.editMessageText(chatId, msgId,
           isUsed
-            ? '⚠️ *Тестовый период уже использован*\n\nОформите подписку:'
-            : `❌ Ошибка: ${errMsg}`,
+            ? '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку:</i>'
+            : `❌ <b>Ошибка</b>\n\n<i>${esc(errMsg)}</i>`,
           {
-            parse_mode: 'Markdown',
+            parse_mode: 'HTML',
             reply_markup: { inline_keyboard: [
               [{ text: '💳 Купить доступ', callback_data: 'show_plans' }],
               [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
@@ -525,10 +555,10 @@ async function startBot() {
       const linkRows = buildLinksKeyboard(links)
       await bot.editMessageText(chatId, msgId,
         links.length > 0
-          ? `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.\n\n🔌 Нажмите кнопку для подключения:`
-          : `✅ *Тестовый доступ активирован!*\nСрок: ${trialDays} дн.`,
+          ? `✅ <b>Тестовый доступ активирован!</b>\n\n📅 Срок: <b>${trialDays} дн.</b>\n\n<i>Нажмите кнопку ниже для подключения:</i>`
+          : `✅ <b>Тестовый доступ активирован!</b>\n\n📅 Срок: <b>${trialDays} дн.</b>`,
         {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: mergeKeyboard(linkRows, [[{ text: '🏠 Главное меню', callback_data: 'main_menu' }]])
         }
       )
