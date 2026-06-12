@@ -260,31 +260,75 @@ const pendingTrial = new Map()
 function getLang(userId) { return userLang.get(userId) || 'ru' }
 
 // ─── Main menu text ────────────────────────────────────────────────────────────
-function buildMainMenuText(settings, lang) {
+function buildMainMenuText(settings, lang, plans = []) {
   const i18n     = t(lang)
   const name     = esc(settings.bot_name     || 'Telemt Proxy')
   const welcome  = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
   const features = settings.features || ''
 
-  let text = `⚡️ <b>${name}</b>\n<i>${welcome}</i>\n`
+  let text = `⚡️ <b>${name}</b>\n<i>${welcome}</i>\n\n`
 
+  // ── Информационный блок ──────────────────────────────────────────────────────
+  const infoLines = []
+
+  // Особенности сервиса
   if (features) {
     const lines = features.split('\n').filter(Boolean)
-    const formatted = lines.map(l => {
+    lines.forEach(l => {
       const m = l.match(/^[-–—•*]\s*(.+)/)
       if (m) {
         const parts = m[1].split(' - ')
         if (parts.length >= 2) {
-          return `✦ <b>${esc(parts[0].trim())}</b>\n    <i>${esc(parts.slice(1).join(' - ').trim())}</i>`
+          infoLines.push(`▸ <b>${esc(parts[0].trim())}</b> — <i>${esc(parts.slice(1).join(' - ').trim())}</i>`)
+        } else {
+          infoLines.push(`▸ <b>${esc(m[1])}</b>`)
         }
-        return `✦ <b>${esc(m[1])}</b>`
+      } else {
+        infoLines.push(`▸ <b>${esc(l)}</b>`)
       }
-      return `✦ <b>${esc(l)}</b>`
-    }).join('\n\n')
-    text += `\n<blockquote>${formatted}</blockquote>\n`
+    })
   }
 
-  text += `\n${i18n.chooseAction}`
+  // Разделитель если есть и features и plans/trial
+  const hasPricing = plans.length > 0 || settings.trial_days
+  if (infoLines.length > 0 && hasPricing) infoLines.push('')
+
+  // Тестовый доступ
+  if (settings.trial_days) {
+    const days = settings.trial_days
+    const label = lang === 'en'
+      ? `🎁 <b>Free trial:</b> ${days} day${days > 1 ? 's' : ''}`
+      : `🎁 <b>Тестовый период:</b> ${days} ${days === 1 ? 'день' : days < 5 ? 'дня' : 'дней'} бесплатно`
+    infoLines.push(label)
+  }
+
+  // Тарифы — самый дешёвый и самый дорогой
+  if (plans.length > 0) {
+    const sorted   = [...plans].sort((a, b) => a.price - b.price)
+    const cheapest = sorted[0]
+    const priciest = sorted[sorted.length - 1]
+    if (cheapest.id === priciest.id) {
+      const label = lang === 'en'
+        ? `💳 <b>Price:</b> from ${cheapest.price} ₽`
+        : `💳 <b>Стоимость:</b> от ${cheapest.price} ₽`
+      infoLines.push(label)
+    } else {
+      const label = lang === 'en'
+        ? `💳 <b>Price:</b> ${cheapest.price} – ${priciest.price} ₽`
+        : `💳 <b>Стоимость:</b> ${cheapest.price} – ${priciest.price} ₽`
+      infoLines.push(label)
+    }
+    // Показываем тарифы
+    plans.forEach(p => {
+      infoLines.push(`  · ${esc(p.label)} — <b>${p.price} ₽</b>`)
+    })
+  }
+
+  if (infoLines.length > 0) {
+    text += `<blockquote>${infoLines.join('\n')}</blockquote>\n\n`
+  }
+
+  text += i18n.chooseAction
   return text
 }
 
@@ -303,7 +347,8 @@ async function sendOrEditMain(bot, msg, settings) {
   const userId = msg.from.id
   const chatId = msg.chat.id
   const lang   = getLang(userId)
-  const text   = buildMainMenuText(settings, lang)
+  const plans  = await getPlans()
+  const text   = buildMainMenuText(settings, lang, plans)
   const prev   = lastMsg.get(userId)
   if (prev && prev.chatId === chatId) {
     const r = await bot.editMessageText(prev.chatId, prev.msgId, text, {
@@ -357,8 +402,8 @@ async function startBot() {
 
     // Главное меню
     if (data === 'main_menu') {
-      const s = await getSettings()
-      await editScreen(bot, query, buildMainMenuText(s, lang), {
+      const [s, plans] = await Promise.all([getSettings(), getPlans()])
+      await editScreen(bot, query, buildMainMenuText(s, lang, plans), {
         parse_mode: 'HTML', reply_markup: mainMenuKeyboard(lang)
       })
       return
@@ -551,8 +596,8 @@ async function startBot() {
     if (data === 'lang_en' || data === 'lang_ru') {
       const newLang = data === 'lang_en' ? 'en' : 'ru'
       userLang.set(userId, newLang)
-      const s = await getSettings()
-      await editScreen(bot, query, buildMainMenuText(s, newLang), {
+      const [s, plans] = await Promise.all([getSettings(), getPlans()])
+      await editScreen(bot, query, buildMainMenuText(s, newLang, plans), {
         parse_mode: 'HTML', reply_markup: mainMenuKeyboard(newLang)
       })
       return
