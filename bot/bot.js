@@ -45,35 +45,31 @@ function esc(str) {
 // ─── Translations ─────────────────────────────────────────────────────────────
 const T = {
   ru: {
-    // Main menu
     chooseAction: 'Выберите нужное действие:',
-    // Keyboards
-    kTrial:    '🛡 Тестовый доступ',
-    kBuy:      '💳 Купить доступ',
-    kAccess:   '🔑 Мой доступ',
-    kProfile:  '👤 Профиль',
-    kSupport:  '💬 Поддержка',
-    kAbout:    '📖 О нас',
-    kReferral: '👥 Рефералы',
-    kTopup:    '💰 Пополнить',
-    kLang:     '🌐 English',
-    kLangCb:   'lang_en',
-    kHome:     '🏠 Главное меню',
-    kBack:     '← Назад',
-    kBuyShort: '💳 Купить',
-    kRenew:    '🔄 Продлить',
-    kShare:    '📤 Поделиться',
-    kWrite:    '✉️ Написать',
-    kConnect:  (n, total) => total > 1 ? `⚡️ Подключить · Сервер ${n}` : '⚡️ Подключить',
+    kTrial:     '🛡 Тестовый доступ',
+    kBuy:       '💳 Купить доступ',
+    kAccess:    '🔑 Мой доступ',
+    kProfile:   '👤 Профиль',
+    kSupport:   '💬 Поддержка',
+    kAbout:     '📖 О нас',
+    kReferral:  '👥 Рефералы',
+    kTopup:     '💰 Пополнить',
+    kLang:      '🌐 English',
+    kLangCb:    'lang_en',
+    kHome:      '🏠 Главное меню',
+    kBack:      '← Назад',
+    kBuyShort:  '💳 Купить',
+    kRenew:     '🔄 Продлить',
+    kShare:     '📤 Поделиться',
+    kWrite:     '✉️ Написать',
+    kConnect:   (n, total) => total > 1 ? `⚡️ Подключить · Сервер ${n}` : '⚡️ Подключить',
     kSubscribe: (ch) => `🔔 Подписаться на @${ch}`,
-    kSubscribed: '✅ Я подписался',
-    kToPlans:  '← К тарифам',
-    // Plans screen
+    kSubscribed:'✅ Я подписался',
+    kToPlans:   '← К тарифам',
     plansTitle: (name) => `💎 <b>${name}</b>\n\n<i>Выберите подходящий тарифный план:</i>`,
     plansEmpty: '⚠️ <b>Тарифы не настроены</b>\n\n<i>Обратитесь к администратору.</i>',
-    planLabel: (label, price) => `💎 ${label} — ${price} ₽`,
-    // Trial
-    trialUsed: '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку, чтобы продолжить:</i>',
+    planLabel:  (label, price) => `💎 ${label} — ${price} ₽`,
+    trialUsed:  '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку, чтобы продолжить:</i>',
     trialChannel: (ch, days) =>
       `📢 <b>Подпишитесь на канал</b>\n\n<i>Для получения тестового доступа необходимо подписаться на наш канал.</i>\n\nПосле подписки нажмите <b>«✅ Я подписался»</b> — доступ выдастся автоматически.\n\n⏱ Тест: <b>${days} дн.</b>`,
     trialActivated: (days, hasLinks) => hasLinks
@@ -81,124 +77,114 @@ const T = {
       : `✅ <b>Тестовый доступ активирован!</b>\n\n📅 Срок: <b>${days} дн.</b>\n\n<i>Ссылки для подключения появятся после настройки нод.</i>`,
     trialUsedShort: '⚠️ <b>Тестовый период уже использован</b>\n\n<i>Оформите подписку:</i>',
     trialError: (msg) => `❌ <b>Ошибка</b>\n\n<i>${msg}</i>`,
-    // Access
-    noAccess: '🔒 <b>Нет активного доступа</b>\n\n<i>Оформите подписку или активируйте тестовый период.</i>',
-    accessTitle: '🔑 <b>Ваш доступ</b>\n\n',
-    accessUntil: (badge, date) => `${badge} Активен до: <b>${date}</b>\n`,
+    noAccess:   '🔒 <b>Нет активного доступа</b>\n\n<i>Оформите подписку или активируйте тестовый период.</i>',
+    accessTitle:'🔑 <b>Ваш доступ</b>\n\n',
+    accessUntil:(badge, date) => `${badge} Активен до: <b>${date}</b>\n`,
     accessDays: (d) => `⏳ Осталось: <b>${d} дн.</b>\n`,
     accessConnect: '\n<i>Нажмите кнопку ниже для подключения к прокси:</i>',
-    locale: 'ru-RU',
-    // Profile
-    profileTitle: '👤 <b>Профиль</b>\n\n',
-    profileId: (id) => `<b>ID:</b> <code>${id}</code>\n`,
+    locale:     'ru-RU',
+    profileTitle:'👤 <b>Профиль</b>\n\n',
+    profileId:  (id) => `<b>ID:</b> <code>${id}</code>\n`,
     profileUsername: (u) => `<b>Username:</b> @${u}\n`,
-    profileName: (n) => `<b>Имя:</b> ${n}\n`,
+    profileName:(n) => `<b>Имя:</b> ${n}\n`,
     profileReg: (d) => `<b>Регистрация:</b> ${d}\n\n`,
     profileAccess: (active) => `<b>Доступ:</b> ${active ? '🟢 Активен' : '🔴 Не активен'}\n`,
-    profileRefs: (n) => `<b>Рефералов:</b> ${n}\n`,
+    profileRefs:(n) => `<b>Рефералов:</b> ${n}\n`,
     profileBalance: (b) => `<b>Баланс:</b> ${b} ₽`,
-    // Referral
-    refTitle: '👥 <b>Реферальная программа</b>\n\n',
-    refBonus: (d) => `🎁 За каждого приглашённого: <b>+${d} дн.</b>\n`,
-    refCount: (n) => `👤 Ваших рефералов: <b>${n}</b>\n\n`,
-    refLink: (l) => `🔗 <b>Ваша ссылка:</b>\n<code>${l}</code>`,
+    refTitle:   '👥 <b>Реферальная программа</b>\n\n',
+    refBonus:   (d) => `🎁 За каждого приглашённого: <b>+${d} дн.</b>\n`,
+    refCount:   (n) => `👤 Ваших рефералов: <b>${n}</b>\n\n`,
+    refLink:    (l) => `🔗 <b>Ваша ссылка:</b>\n<code>${l}</code>`,
     refShareText: 'Быстрый MTProxy для Telegram!',
-    // About
     aboutTitle: '📖 <b>О нас</b>\n\n',
     aboutDefault: 'Надёжный MTProxy для Telegram.',
-    // Support
     supportTitle: '💬 <b>Поддержка</b>\n\n',
-    supportLink: (l) => `Свяжитесь с нами: ${l}`,
+    supportLink:(l) => `Свяжитесь с нами: ${l}`,
     supportNoLink: '<i>Обратитесь к администратору бота.</i>',
-    // Topup
     topupTitle: '💰 <b>Пополнение баланса</b>\n\n<i>Способ оплаты будет настроен позже.\nОбратитесь к администратору.</i>',
-    // Buy
-    buyNotFound: '❌ <b>Тариф не найден.</b>',
-    buyTitle: (label, price) => `💳 <b>Оформление подписки</b>\n\n📋 Тариф: <b>${label}</b>\n💰 Сумма: <b>${price} ₽</b>\n\n<i>Способ оплаты будет добавлен позже.\nОбратитесь к администратору.</i>`,
+    buyNotFound:'❌ <b>Тариф не найден.</b>',
+    buyTitle:   (label, price) => `💳 <b>Оформление подписки</b>\n\n📋 Тариф: <b>${label}</b>\n💰 Сумма: <b>${price} ₽</b>\n\n<i>Способ оплаты будет добавлен позже.\nОбратитесь к администратору.</i>`,
   },
   en: {
     chooseAction: 'Choose an action:',
-    kTrial:    '🛡 Trial access',
-    kBuy:      '💳 Buy access',
-    kAccess:   '🔑 My access',
-    kProfile:  '👤 Profile',
-    kSupport:  '💬 Support',
-    kAbout:    '📖 About',
-    kReferral: '👥 Referrals',
-    kTopup:    '💰 Top up',
-    kLang:     '🌐 Русский',
-    kLangCb:   'lang_ru',
-    kHome:     '🏠 Main menu',
-    kBack:     '← Back',
-    kBuyShort: '💳 Buy',
-    kRenew:    '🔄 Renew',
-    kShare:    '📤 Share',
-    kWrite:    '✉️ Contact',
-    kConnect:  (n, total) => total > 1 ? `⚡️ Connect · Server ${n}` : '⚡️ Connect',
+    kTrial:     '🛡 Trial access',
+    kBuy:       '💳 Buy access',
+    kAccess:    '🔑 My access',
+    kProfile:   '👤 Profile',
+    kSupport:   '💬 Support',
+    kAbout:     '📖 About',
+    kReferral:  '👥 Referrals',
+    kTopup:     '💰 Top up',
+    kLang:      '🌐 Русский',
+    kLangCb:    'lang_ru',
+    kHome:      '🏠 Main menu',
+    kBack:      '← Back',
+    kBuyShort:  '💳 Buy',
+    kRenew:     '🔄 Renew',
+    kShare:     '📤 Share',
+    kWrite:     '✉️ Contact',
+    kConnect:   (n, total) => total > 1 ? `⚡️ Connect · Server ${n}` : '⚡️ Connect',
     kSubscribe: (ch) => `🔔 Subscribe to @${ch}`,
-    kSubscribed: '✅ I subscribed',
-    kToPlans:  '← Back to plans',
+    kSubscribed:'✅ I subscribed',
+    kToPlans:   '← Back to plans',
     plansTitle: (name) => `💎 <b>${name}</b>\n\n<i>Choose a subscription plan:</i>`,
     plansEmpty: '⚠️ <b>No plans configured</b>\n\n<i>Please contact the administrator.</i>',
-    planLabel: (label, price) => `💎 ${label} — ${price} ₽`,
-    trialUsed: '⚠️ <b>Trial period already used</b>\n\n<i>Purchase a subscription to continue:</i>',
+    planLabel:  (label, price) => `💎 ${label} — ${price} ₽`,
+    trialUsed:  '⚠️ <b>Trial period already used</b>\n\n<i>Purchase a subscription to continue:</i>',
     trialChannel: (ch, days) =>
-      `📢 <b>Subscribe to the channel</b>\n\n<i>To get trial access, you need to subscribe to our channel.</i>\n\nAfter subscribing, press <b>«✅ I subscribed»</b> — access will be granted automatically.\n\n⏱ Trial: <b>${days} day(s)</b>`,
+      `📢 <b>Subscribe to the channel</b>\n\n<i>To get trial access, subscribe to our channel.</i>\n\nAfter subscribing press <b>«✅ I subscribed»</b> — access will be granted automatically.\n\n⏱ Trial: <b>${days} day(s)</b>`,
     trialActivated: (days, hasLinks) => hasLinks
       ? `✅ <b>Trial access activated!</b>\n\n📅 Duration: <b>${days} day(s)</b>\n\n<i>Press the button below to connect to the proxy:</i>`
       : `✅ <b>Trial access activated!</b>\n\n📅 Duration: <b>${days} day(s)</b>\n\n<i>Connection links will appear once nodes are configured.</i>`,
     trialUsedShort: '⚠️ <b>Trial period already used</b>\n\n<i>Purchase a subscription:</i>',
     trialError: (msg) => `❌ <b>Error</b>\n\n<i>${msg}</i>`,
-    noAccess: '🔒 <b>No active access</b>\n\n<i>Purchase a subscription or activate the trial period.</i>',
-    accessTitle: '🔑 <b>Your access</b>\n\n',
-    accessUntil: (badge, date) => `${badge} Active until: <b>${date}</b>\n`,
+    noAccess:   '🔒 <b>No active access</b>\n\n<i>Purchase a subscription or activate the trial period.</i>',
+    accessTitle:'🔑 <b>Your access</b>\n\n',
+    accessUntil:(badge, date) => `${badge} Active until: <b>${date}</b>\n`,
     accessDays: (d) => `⏳ Remaining: <b>${d} day(s)</b>\n`,
     accessConnect: '\n<i>Press the button below to connect to the proxy:</i>',
-    locale: 'en-GB',
-    profileTitle: '👤 <b>Profile</b>\n\n',
-    profileId: (id) => `<b>ID:</b> <code>${id}</code>\n`,
+    locale:     'en-GB',
+    profileTitle:'👤 <b>Profile</b>\n\n',
+    profileId:  (id) => `<b>ID:</b> <code>${id}</code>\n`,
     profileUsername: (u) => `<b>Username:</b> @${u}\n`,
-    profileName: (n) => `<b>Name:</b> ${n}\n`,
+    profileName:(n) => `<b>Name:</b> ${n}\n`,
     profileReg: (d) => `<b>Registered:</b> ${d}\n\n`,
     profileAccess: (active) => `<b>Access:</b> ${active ? '🟢 Active' : '🔴 Inactive'}\n`,
-    profileRefs: (n) => `<b>Referrals:</b> ${n}\n`,
+    profileRefs:(n) => `<b>Referrals:</b> ${n}\n`,
     profileBalance: (b) => `<b>Balance:</b> ${b} ₽`,
-    refTitle: '👥 <b>Referral program</b>\n\n',
-    refBonus: (d) => `🎁 For each invited friend: <b>+${d} day(s)</b>\n`,
-    refCount: (n) => `👤 Your referrals: <b>${n}</b>\n\n`,
-    refLink: (l) => `🔗 <b>Your link:</b>\n<code>${l}</code>`,
+    refTitle:   '👥 <b>Referral program</b>\n\n',
+    refBonus:   (d) => `🎁 For each invited friend: <b>+${d} day(s)</b>\n`,
+    refCount:   (n) => `👤 Your referrals: <b>${n}</b>\n\n`,
+    refLink:    (l) => `🔗 <b>Your link:</b>\n<code>${l}</code>`,
     refShareText: 'Fast MTProxy for Telegram!',
     aboutTitle: '📖 <b>About</b>\n\n',
     aboutDefault: 'Reliable MTProxy for Telegram.',
     supportTitle: '💬 <b>Support</b>\n\n',
-    supportLink: (l) => `Contact us: ${l}`,
+    supportLink:(l) => `Contact us: ${l}`,
     supportNoLink: '<i>Please contact the bot administrator.</i>',
     topupTitle: '💰 <b>Top up balance</b>\n\n<i>Payment method will be configured later.\nPlease contact the administrator.</i>',
-    buyNotFound: '❌ <b>Plan not found.</b>',
-    buyTitle: (label, price) => `💳 <b>Purchase subscription</b>\n\n📋 Plan: <b>${label}</b>\n💰 Amount: <b>${price} ₽</b>\n\n<i>Payment method will be added later.\nPlease contact the administrator.</i>`,
+    buyNotFound:'❌ <b>Plan not found.</b>',
+    buyTitle:   (label, price) => `💳 <b>Purchase subscription</b>\n\n📋 Plan: <b>${label}</b>\n💰 Amount: <b>${price} ₽</b>\n\n<i>Payment method will be added later.\nPlease contact the administrator.</i>`,
   }
 }
 
 function t(lang) { return T[lang] || T.ru }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Panel API helpers ─────────────────────────────────────────────────────────
 async function loadToken() {
   if (process.env.BOT_TOKEN) return process.env.BOT_TOKEN
   const s = await api('/settings').catch(() => null)
   return s?.bot_token && s.bot_token !== '***' ? s.bot_token : ''
 }
-
 async function getSettings() {
   const s = await api('/settings').catch(() => ({}))
   if (process.env.BOT_TOKEN && s && !s.bot_token) s.bot_token = process.env.BOT_TOKEN
   return s || {}
 }
-
 async function getPlans() {
   const plans = await api('/plans')
   return (Array.isArray(plans) ? plans : []).filter(p => p.enabled)
 }
-
 async function getOrCreateUser(from) {
   const { id, first_name, last_name, username } = from
   let user = await api(`/users/${id}`)
@@ -210,33 +196,19 @@ async function getOrCreateUser(from) {
   }
   return user || {}
 }
-
 async function getProxyLinks(telegramId) {
   const result = await api(`/users/${telegramId}/links`)
   return result?.links || []
 }
-
 async function isSubscribedToChannel(bot, userId, channelUsername) {
   if (!channelUsername) return true
   const chatId = channelUsername.startsWith('@') ? channelUsername : `@${channelUsername}`
   try {
     const r = await bot.getChatMember(chatId, userId)
     if (!r || !r.ok) return false
-    const status = r.result?.status
-    return ['member', 'administrator', 'creator'].includes(status)
+    return ['member', 'administrator', 'creator'].includes(r.result?.status)
   } catch { return false }
 }
-
-function buildLinksKeyboard(links, lang) {
-  if (!links || links.length === 0) return []
-  const i18n = t(lang)
-  return links.map((link, i) => [{ text: i18n.kConnect(i + 1, links.length), url: link }])
-}
-
-function mergeKeyboard(linkRows, actionRows) {
-  return { inline_keyboard: [...linkRows, ...actionRows] }
-}
-
 async function handleReferral(userId, referrerId) {
   if (!referrerId || referrerId === userId) return
   const refUser = await api(`/users/${referrerId}`)
@@ -245,25 +217,44 @@ async function handleReferral(userId, referrerId) {
   const bonusDays = settings.ref_bonus_days || 3
   await api(`/users/${referrerId}`, { method: 'PATCH', body: { referral_count: (refUser.referral_count || 0) + 1 } })
   const now = Date.now()
-  if (refUser.subscription_until && refUser.subscription_until > now) {
+  if (refUser.subscription_until && refUser.subscription_until > now)
     await api(`/users/${referrerId}`, { method: 'PATCH', body: { subscription_until: refUser.subscription_until + bonusDays * 86400000 } })
-  }
 }
 
-// ─── Keyboards ────────────────────────────────────────────────────────────────
-function mainMenuKeyboard(lang) {
+// ─── Keyboards ─────────────────────────────────────────────────────────────────
+
+// Reply keyboard — встроена внизу экрана как клавиатура
+function mainMenuReplyKeyboard(lang) {
   const i18n = t(lang)
   return {
-    inline_keyboard: [
-      [{ text: i18n.kTrial, callback_data: 'trial' },    { text: i18n.kBuy,      callback_data: 'show_plans' }],
-      [{ text: i18n.kAccess, callback_data: 'my_access' }, { text: i18n.kProfile, callback_data: 'profile' }],
-      [{ text: i18n.kSupport, callback_data: 'support' },  { text: i18n.kAbout,   callback_data: 'about' }],
-      [{ text: i18n.kReferral, callback_data: 'referral' }, { text: i18n.kTopup,  callback_data: 'topup' }],
-      [{ text: i18n.kLang, callback_data: i18n.kLangCb }],
-    ]
+    keyboard: [
+      [i18n.kTrial,    i18n.kBuy],
+      [i18n.kAccess,   i18n.kProfile],
+      [i18n.kSupport,  i18n.kAbout],
+      [i18n.kReferral, i18n.kTopup],
+      [i18n.kLang],
+    ],
+    resize_keyboard: true,
+    persistent: true,
   }
 }
 
+// Inline keyboard — внутри сообщения для подэкранов
+function inlineBack(lang, cb = 'main_menu') {
+  return { inline_keyboard: [[{ text: t(lang).kBack, callback_data: cb }]] }
+}
+function inlineBackHome(lang) {
+  const i18n = t(lang)
+  return { inline_keyboard: [[{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+}
+function mergeKeyboard(linkRows, actionRows) {
+  return { inline_keyboard: [...linkRows, ...actionRows] }
+}
+function buildLinksKeyboard(links, lang) {
+  if (!links || links.length === 0) return []
+  const i18n = t(lang)
+  return links.map((link, i) => [{ text: i18n.kConnect(i + 1, links.length), url: link }])
+}
 function plansKeyboard(plans, lang) {
   const i18n = t(lang)
   const rows = plans.map(p => [{ text: i18n.planLabel(p.label, p.price), callback_data: `buy_${p.id}` }])
@@ -271,42 +262,22 @@ function plansKeyboard(plans, lang) {
   return { inline_keyboard: rows }
 }
 
-function backKbd(lang, cb = 'main_menu') {
-  return { inline_keyboard: [[{ text: t(lang).kBack, callback_data: cb }]] }
-}
-
-// ─── User language preference ─────────────────────────────────────────────────
+// ─── Language preference ───────────────────────────────────────────────────────
 const userLang = new Map()
 function getLang(userId) { return userLang.get(userId) || 'ru' }
 
-// ─── Message tracking ─────────────────────────────────────────────────────────
-const lastMsg = new Map()
+// ─── Message state ─────────────────────────────────────────────────────────────
+const lastMsg    = new Map() // userId → { chatId, msgId }  — last sub-screen message
 const pendingTrial = new Map()
 
-async function editScreen(bot, query, text, opts = {}) {
-  const chatId = query.message.chat.id
-  const msgId = query.message.message_id
-  const userId = query.from.id
-  try {
-    const r = await bot.editMessageText(chatId, msgId, text, opts)
-    if (r && r.ok) { lastMsg.set(userId, { chatId, msgId }); return r.result }
-    console.warn(`[bot] editMessageText failed: ${JSON.stringify(r?.description || r)}`)
-  } catch (e) { console.warn('[bot] editMessageText error:', e.message) }
-  try {
-    const sent = await bot.sendMessage(chatId, text, opts)
-    if (sent && sent.ok && sent.result) { lastMsg.set(userId, { chatId, msgId: sent.result.message_id }); return sent.result }
-  } catch (e) { console.error('[bot] sendMessage fallback error:', e.message) }
-}
-
-// ─── Main menu text ───────────────────────────────────────────────────────────
+// ─── Main menu text ────────────────────────────────────────────────────────────
 function buildMainMenuText(settings, lang) {
   const i18n = t(lang)
-  const name = esc(settings.bot_name || 'Telemt Proxy')
+  const name    = esc(settings.bot_name    || 'Telemt Proxy')
   const welcome = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
   const features = settings.features || ''
 
   let text = `⚡️ <b>${name}</b>\n<i>${welcome}</i>\n`
-
   if (features) {
     const lines = features.split('\n').filter(Boolean)
     const formatted = lines.map(l => {
@@ -320,20 +291,60 @@ function buildMainMenuText(settings, lang) {
     }).join('\n')
     text += `\n<blockquote>${formatted}</blockquote>\n`
   }
-
   text += `\n${i18n.chooseAction}`
   return text
 }
 
-// ─── Bot startup ──────────────────────────────────────────────────────────────
+// ─── Send/edit helpers ─────────────────────────────────────────────────────────
+
+// Отправить главное меню (только текст + Reply keyboard)
+async function sendMainMenu(bot, chatId, userId, settings) {
+  const lang = getLang(userId)
+  const r = await bot.sendMessage(chatId, buildMainMenuText(settings, lang), {
+    parse_mode: 'HTML',
+    reply_markup: mainMenuReplyKeyboard(lang)
+  })
+  if (r?.ok && r?.result) lastMsg.set(userId, { chatId, msgId: r.result.message_id })
+}
+
+// Отправить или отредактировать подэкран (только inline keyboard)
+async function showSubScreen(bot, chatId, userId, text, opts = {}) {
+  const prev = lastMsg.get(userId)
+  if (prev && prev.chatId === chatId) {
+    const r = await bot.editMessageText(prev.chatId, prev.msgId, text, opts)
+    if (r?.ok) return
+  }
+  const r = await bot.sendMessage(chatId, text, opts)
+  if (r?.ok && r?.result) lastMsg.set(userId, { chatId, msgId: r.result.message_id })
+}
+
+// Для callback_query: редактировать сообщение из query
+async function editSubScreen(bot, query, text, opts = {}) {
+  const chatId = query.message.chat.id
+  const msgId  = query.message.message_id
+  const userId = query.from.id
+  const r = await bot.editMessageText(chatId, msgId, text, opts)
+  if (r?.ok) { lastMsg.set(userId, { chatId, msgId }); return }
+  const sent = await bot.sendMessage(chatId, text, opts)
+  if (sent?.ok && sent?.result) lastMsg.set(userId, { chatId, msgId: sent.result.message_id })
+}
+
+// ─── All button labels for text matching ──────────────────────────────────────
+function allLabels(key) {
+  return [T.ru[key], T.en[key]].filter(Boolean)
+}
+function matchesButton(text, key) {
+  return allLabels(key).includes(text)
+}
+
+// ─── Bot startup ───────────────────────────────────────────────────────────────
 async function startBot() {
   const token = await loadToken()
   if (!token) {
-    console.log('[bot] Токен не настроен. Добавьте токен в Панель → Бот → Настройки.')
+    console.log('[bot] Токен не настроен. Добавьте BOT_TOKEN в переменные окружения.')
     setTimeout(startBot, 30000)
     return
   }
-
   console.log('[bot] Запускаем Telegram бот...')
   const bot = new TelegramBot(token)
   const me = await bot.getMe()
@@ -354,295 +365,454 @@ async function startBot() {
       await handleReferral(msg.from.id, referrerId)
     }
     const s = await getSettings()
-    const lang = getLang(msg.from.id)
-    const r = await bot.sendMessage(msg.chat.id, buildMainMenuText(s, lang), {
-      parse_mode: 'HTML',
-      reply_markup: mainMenuKeyboard(lang)
-    })
-    if (r?.ok && r?.result) lastMsg.set(msg.from.id, { chatId: msg.chat.id, msgId: r.result.message_id })
+    await sendMainMenu(bot, msg.chat.id, msg.from.id, s)
   })
 
-  // ── Callback queries ──────────────────────────────────────────────────────────
-  bot.on('callback_query', async (query) => {
-    const userId = query.from.id
-    const data = query.data
-    await bot.answerCallbackQuery(query.id)
-    const lang = getLang(userId)
-    const i18n = t(lang)
+  // ── Обработчик всех текстовых кнопок (Reply keyboard) ────────────────────────
+  bot.onText(/^(.+)$/, async (msg) => {
+    const text   = msg.text || ''
+    const userId = msg.from.id
+    const chatId = msg.chat.id
+    const lang   = getLang(userId)
+    const i18n   = t(lang)
 
-    // ── Переключение языка ─────────────────────────────────────────────────────
-    if (data === 'lang_en' || data === 'lang_ru') {
-      const newLang = data === 'lang_en' ? 'en' : 'ru'
+    // ── Язык ──────────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kLang')) {
+      const newLang = text === T.ru.kLang ? 'en' : 'ru'
       userLang.set(userId, newLang)
       const s = await getSettings()
-      await editScreen(bot, query, buildMainMenuText(s, newLang), {
-        parse_mode: 'HTML',
-        reply_markup: mainMenuKeyboard(newLang)
-      })
+      await sendMainMenu(bot, chatId, userId, s)
       return
     }
 
-    // ── Главное меню ───────────────────────────────────────────────────────────
-    if (data === 'main_menu') {
-      const s = await getSettings()
-      await editScreen(bot, query, buildMainMenuText(s, lang), {
-        parse_mode: 'HTML',
-        reply_markup: mainMenuKeyboard(lang)
-      })
+    // ── Тестовый доступ ───────────────────────────────────────────────────────
+    if (matchesButton(text, 'kTrial')) {
+      await handleTrial(bot, chatId, userId, msg.from, lang, i18n)
       return
     }
 
-    // ── Тарифы ────────────────────────────────────────────────────────────────
-    if (data === 'show_plans') {
+    // ── Купить доступ ─────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kBuy')) {
       const plans = await getPlans()
       if (!plans.length) {
-        await editScreen(bot, query, i18n.plansEmpty, { parse_mode: 'HTML', reply_markup: backKbd(lang) })
+        await showSubScreen(bot, chatId, userId, i18n.plansEmpty, { parse_mode: 'HTML', reply_markup: inlineBack(lang) })
         return
       }
       const s = await getSettings()
-      await editScreen(bot, query, i18n.plansTitle(esc(s.bot_name || 'Proxy')), {
-        parse_mode: 'HTML',
-        reply_markup: plansKeyboard(plans, lang)
+      await showSubScreen(bot, chatId, userId, i18n.plansTitle(esc(s.bot_name || 'Proxy')), {
+        parse_mode: 'HTML', reply_markup: plansKeyboard(plans, lang)
       })
       return
     }
 
-    // ── Тестовый доступ ────────────────────────────────────────────────────────
-    if (data === 'trial' || data === 'check_sub') {
-      const user = await getOrCreateUser(query.from)
+    // ── Мой доступ ────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kAccess')) {
+      await handleMyAccess(bot, chatId, userId, lang, i18n)
+      return
+    }
+
+    // ── Профиль ───────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kProfile')) {
+      await handleProfile(bot, chatId, userId, msg.from, lang, i18n)
+      return
+    }
+
+    // ── Поддержка ─────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kSupport')) {
+      await handleSupport(bot, chatId, userId, lang, i18n)
+      return
+    }
+
+    // ── О нас ─────────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kAbout')) {
       const s = await getSettings()
-      const trialDays = s.trial_days || 1
-      const channel = (s.required_channel || '').trim().replace(/^@/, '')
-
-      if (user.trial_used) {
-        await editScreen(bot, query, i18n.trialUsed, {
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: [
-            [{ text: i18n.kBuy, callback_data: 'show_plans' }],
-            [{ text: i18n.kBack, callback_data: 'main_menu' }]
-          ]}
-        })
-        return
-      }
-
-      if (channel) {
-        const subscribed = await isSubscribedToChannel(bot, userId, channel)
-        if (!subscribed) {
-          await editScreen(bot, query, i18n.trialChannel(channel, trialDays), {
-            parse_mode: 'HTML',
-            reply_markup: { inline_keyboard: [
-              [{ text: i18n.kSubscribe(channel), url: `https://t.me/${channel}` }],
-              [{ text: i18n.kSubscribed, callback_data: 'check_sub' }],
-              [{ text: i18n.kBack, callback_data: 'main_menu' }]
-            ]}
-          })
-          pendingTrial.set(userId, { chatId: query.message.chat.id, msgId: query.message.message_id })
-          return
-        }
-        pendingTrial.delete(userId)
-      }
-
-      const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
-      if (!result || result.error) {
-        const errMsg = result?.error || 'Unknown error'
-        const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
-        await editScreen(bot, query, isUsed ? i18n.trialUsedShort : i18n.trialError(esc(errMsg)), {
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: [
-            [{ text: i18n.kBuy, callback_data: 'show_plans' }],
-            [{ text: i18n.kBack, callback_data: 'main_menu' }]
-          ]}
-        })
-        return
-      }
-
-      const links = await getProxyLinks(userId)
-      const linkRows = buildLinksKeyboard(links, lang)
-      await editScreen(bot, query, i18n.trialActivated(trialDays, links.length > 0), {
-        parse_mode: 'HTML',
-        reply_markup: mergeKeyboard(linkRows, [[{ text: i18n.kHome, callback_data: 'main_menu' }]])
-      })
-      return
-    }
-
-    // ── Мой доступ ─────────────────────────────────────────────────────────────
-    if (data === 'my_access') {
-      const user = await getOrCreateUser(query.from)
-      const now = Date.now()
-      const active = user.subscription_until && user.subscription_until > now
-      if (!active) {
-        await editScreen(bot, query, i18n.noAccess, {
-          parse_mode: 'HTML',
-          reply_markup: { inline_keyboard: [
-            [{ text: i18n.kTrial, callback_data: 'trial' }, { text: i18n.kBuyShort, callback_data: 'show_plans' }],
-            [{ text: i18n.kBack, callback_data: 'main_menu' }]
-          ]}
-        })
-        return
-      }
-      const links = await getProxyLinks(userId)
-      const linkRows = buildLinksKeyboard(links, lang)
-      const until = new Date(user.subscription_until).toLocaleDateString(i18n.locale)
-      const daysLeft = Math.ceil((user.subscription_until - now) / 86400000)
-      const badge = daysLeft <= 3 ? '🔴' : daysLeft <= 7 ? '🟡' : '🟢'
-      let text = i18n.accessTitle + i18n.accessUntil(badge, until) + i18n.accessDays(daysLeft)
-      if (links.length > 0) text += i18n.accessConnect
-      await editScreen(bot, query, text, {
-        parse_mode: 'HTML',
-        reply_markup: mergeKeyboard(linkRows, [
-          [{ text: i18n.kRenew, callback_data: 'show_plans' }],
-          [{ text: i18n.kBack, callback_data: 'main_menu' }]
-        ])
-      })
-      return
-    }
-
-    // ── Профиль ────────────────────────────────────────────────────────────────
-    if (data === 'profile') {
-      const user = await getOrCreateUser(query.from)
-      const now = Date.now()
-      const active = user.subscription_until && user.subscription_until > now
-      const reg = user.created_at ? new Date(user.created_at).toLocaleDateString(i18n.locale) : '—'
-      const name = esc([query.from.first_name, query.from.last_name].filter(Boolean).join(' ') || '—')
-      let text = i18n.profileTitle
-      text += i18n.profileId(userId)
-      if (query.from.username) text += i18n.profileUsername(esc(query.from.username))
-      text += i18n.profileName(name)
-      text += i18n.profileReg(reg)
-      text += i18n.profileAccess(active)
-      text += i18n.profileRefs(user.referral_count || 0)
-      text += i18n.profileBalance((user.balance || 0).toFixed(2))
-      await editScreen(bot, query, text, { parse_mode: 'HTML', reply_markup: backKbd(lang) })
-      return
-    }
-
-    // ── Реферальная программа ──────────────────────────────────────────────────
-    if (data === 'referral') {
-      const user = await getOrCreateUser(query.from)
-      const s = await getSettings()
-      const bonusDays = s.ref_bonus_days || 3
-      const refLink = `https://t.me/${me.username}?start=${userId}`
-      let text = i18n.refTitle + i18n.refBonus(bonusDays) + i18n.refCount(user.referral_count || 0) + i18n.refLink(refLink)
-      await editScreen(bot, query, text, {
-        parse_mode: 'HTML',
-        reply_markup: { inline_keyboard: [
-          [{ text: i18n.kShare, url: `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(i18n.refShareText)}` }],
-          [{ text: i18n.kBack, callback_data: 'main_menu' }]
-        ]}
-      })
-      return
-    }
-
-    // ── О нас ──────────────────────────────────────────────────────────────────
-    if (data === 'about') {
-      const s = await getSettings()
-      await editScreen(bot, query,
+      await showSubScreen(bot, chatId, userId,
         i18n.aboutTitle + esc(s.about_text || i18n.aboutDefault),
-        { parse_mode: 'HTML', reply_markup: backKbd(lang) }
+        { parse_mode: 'HTML', reply_markup: inlineBack(lang) }
       )
       return
     }
 
-    // ── Поддержка ──────────────────────────────────────────────────────────────
-    if (data === 'support') {
+    // ── Рефералы ──────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kReferral')) {
+      await handleReferral2(bot, chatId, userId, lang, i18n, me)
+      return
+    }
+
+    // ── Пополнить ─────────────────────────────────────────────────────────────
+    if (matchesButton(text, 'kTopup')) {
+      await showSubScreen(bot, chatId, userId, i18n.topupTitle, { parse_mode: 'HTML', reply_markup: inlineBack(lang) })
+      return
+    }
+  })
+
+  // ── Inline callback queries ───────────────────────────────────────────────────
+  bot.on('callback_query', async (query) => {
+    const userId = query.from.id
+    const chatId = query.message.chat.id
+    const data   = query.data
+    await bot.answerCallbackQuery(query.id)
+    const lang = getLang(userId)
+    const i18n = t(lang)
+
+    // Назад → главное меню
+    if (data === 'main_menu') {
       const s = await getSettings()
-      const raw = (s.support_link || '').trim()
-      let link = raw
-      if (link.startsWith('@')) link = `https://t.me/${link.slice(1)}`
-      else if (/^t\.me\//i.test(link)) link = `https://${link}`
-      const validUrl = /^https?:\/\//i.test(link)
-      const text = i18n.supportTitle + (raw ? i18n.supportLink(esc(raw)) : i18n.supportNoLink)
-      await editScreen(bot, query, text, {
+      await editSubScreen(bot, query, buildMainMenuText(s, lang), {
         parse_mode: 'HTML',
-        reply_markup: validUrl
-          ? { inline_keyboard: [[{ text: i18n.kWrite, url: link }], [{ text: i18n.kBack, callback_data: 'main_menu' }]] }
-          : backKbd(lang)
+        reply_markup: mainMenuReplyKeyboard(lang)
       })
       return
     }
 
-    // ── Пополнить баланс ───────────────────────────────────────────────────────
-    if (data === 'topup') {
-      await editScreen(bot, query, i18n.topupTitle, { parse_mode: 'HTML', reply_markup: backKbd(lang) })
+    // Тарифы
+    if (data === 'show_plans') {
+      const plans = await getPlans()
+      if (!plans.length) {
+        await editSubScreen(bot, query, i18n.plansEmpty, { parse_mode: 'HTML', reply_markup: inlineBack(lang) })
+        return
+      }
+      const s = await getSettings()
+      await editSubScreen(bot, query, i18n.plansTitle(esc(s.bot_name || 'Proxy')), {
+        parse_mode: 'HTML', reply_markup: plansKeyboard(plans, lang)
+      })
       return
     }
 
-    // ── Покупка тарифа ─────────────────────────────────────────────────────────
+    // Тестовый доступ / проверка подписки
+    if (data === 'trial' || data === 'check_sub') {
+      await handleTrialCallback(bot, query, userId, chatId, lang, i18n)
+      return
+    }
+
+    // Мой доступ
+    if (data === 'my_access') {
+      await handleMyAccessCallback(bot, query, userId, chatId, lang, i18n)
+      return
+    }
+
+    // Профиль
+    if (data === 'profile') {
+      await handleProfileCallback(bot, query, userId, lang, i18n)
+      return
+    }
+
+    // Рефералы
+    if (data === 'referral') {
+      await handleReferralCallback(bot, query, userId, lang, i18n, me)
+      return
+    }
+
+    // О нас
+    if (data === 'about') {
+      const s = await getSettings()
+      await editSubScreen(bot, query, i18n.aboutTitle + esc(s.about_text || i18n.aboutDefault),
+        { parse_mode: 'HTML', reply_markup: inlineBack(lang) }
+      )
+      return
+    }
+
+    // Поддержка
+    if (data === 'support') {
+      await handleSupportCallback(bot, query, lang, i18n)
+      return
+    }
+
+    // Пополнить баланс
+    if (data === 'topup') {
+      await editSubScreen(bot, query, i18n.topupTitle, { parse_mode: 'HTML', reply_markup: inlineBack(lang) })
+      return
+    }
+
+    // Покупка тарифа
     if (data.startsWith('buy_')) {
       const planId = data.replace('buy_', '')
-      const plans = await getPlans()
-      const plan = plans.find(p => p.id === planId)
+      const plans  = await getPlans()
+      const plan   = plans.find(p => p.id === planId)
       if (!plan) {
-        await editScreen(bot, query, i18n.buyNotFound, {
-          parse_mode: 'HTML',
-          reply_markup: backKbd(lang, 'show_plans')
-        })
+        await editSubScreen(bot, query, i18n.buyNotFound, { parse_mode: 'HTML', reply_markup: inlineBack(lang, 'show_plans') })
         return
       }
-      await editScreen(bot, query, i18n.buyTitle(esc(plan.label), plan.price), {
+      await editSubScreen(bot, query, i18n.buyTitle(esc(plan.label), plan.price), {
         parse_mode: 'HTML',
         reply_markup: { inline_keyboard: [
           [{ text: i18n.kToPlans, callback_data: 'show_plans' }],
-          [{ text: i18n.kHome, callback_data: 'main_menu' }]
+          [{ text: i18n.kHome,    callback_data: 'main_menu'  }],
         ]}
+      })
+      return
+    }
+
+    // Переключение языка
+    if (data === 'lang_en' || data === 'lang_ru') {
+      const newLang = data === 'lang_en' ? 'en' : 'ru'
+      userLang.set(userId, newLang)
+      const s = await getSettings()
+      await editSubScreen(bot, query, buildMainMenuText(s, newLang), {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuReplyKeyboard(newLang)
       })
       return
     }
   })
 
-  // ── Автовыдача триала при подписке на канал ───────────────────────────────────
+  // ── chat_member ────────────────────────────────────────────────────────────────
   bot.on('chat_member', async (update) => {
     try {
       const newStatus = update.new_chat_member?.status
       const oldStatus = update.old_chat_member?.status
       const user = update.new_chat_member?.user
       if (!user || user.is_bot) return
-      const joined = ['member', 'administrator', 'creator'].includes(newStatus) &&
-        !['member', 'administrator', 'creator'].includes(oldStatus)
+      const joined = ['member','administrator','creator'].includes(newStatus) &&
+        !['member','administrator','creator'].includes(oldStatus)
       if (!joined) return
-
       const userId = user.id
       if (!pendingTrial.has(userId)) return
       const { chatId, msgId } = pendingTrial.get(userId)
       pendingTrial.delete(userId)
-
-      const lang = getLang(userId)
-      const i18n = t(lang)
-      const s = await getSettings()
+      const lang  = getLang(userId)
+      const i18n  = t(lang)
+      const s     = await getSettings()
       const trialDays = s.trial_days || 1
-
       const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
       if (!result || result.error) {
         const errMsg = result?.error || 'Unknown error'
         const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
-        await bot.editMessageText(chatId, msgId,
-          isUsed ? i18n.trialUsedShort : i18n.trialError(esc(errMsg)),
-          {
-            parse_mode: 'HTML',
-            reply_markup: { inline_keyboard: [
-              [{ text: i18n.kBuy, callback_data: 'show_plans' }],
-              [{ text: i18n.kHome, callback_data: 'main_menu' }]
-            ]}
-          }
-        )
+        await bot.editMessageText(chatId, msgId, isUsed ? i18n.trialUsedShort : i18n.trialError(esc(errMsg)), {
+          parse_mode: 'HTML',
+          reply_markup: { inline_keyboard: [[{ text: i18n.kBuy, callback_data: 'show_plans' }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+        })
         return
       }
-
       const links = await getProxyLinks(userId)
       const linkRows = buildLinksKeyboard(links, lang)
-      await bot.editMessageText(chatId, msgId,
-        i18n.trialActivated(trialDays, links.length > 0),
-        {
-          parse_mode: 'HTML',
-          reply_markup: mergeKeyboard(linkRows, [[{ text: i18n.kHome, callback_data: 'main_menu' }]])
-        }
-      )
-    } catch (e) {
-      console.error('[bot] chat_member handler error:', e.message)
-    }
+      await bot.editMessageText(chatId, msgId, i18n.trialActivated(trialDays, links.length > 0), {
+        parse_mode: 'HTML',
+        reply_markup: mergeKeyboard(linkRows, [[{ text: i18n.kHome, callback_data: 'main_menu' }]])
+      })
+    } catch (e) { console.error('[bot] chat_member error:', e.message) }
   })
 
   bot.startPolling()
+}
+
+// ─── Screen handler functions ─────────────────────────────────────────────────
+
+async function handleTrial(bot, chatId, userId, from, lang, i18n) {
+  const user = await getOrCreateUser(from)
+  const s    = await getSettings()
+  const trialDays = s.trial_days || 1
+  const channel   = (s.required_channel || '').trim().replace(/^@/, '')
+
+  if (user.trial_used) {
+    await showSubScreen(bot, chatId, userId, i18n.trialUsed, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kBuy, callback_data: 'show_plans' }]] }
+    })
+    return
+  }
+  if (channel) {
+    const subscribed = await isSubscribedToChannel(bot, userId, channel)
+    if (!subscribed) {
+      const r = await showSubScreen(bot, chatId, userId, i18n.trialChannel(channel, trialDays), {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [
+          [{ text: i18n.kSubscribe(channel), url: `https://t.me/${channel}` }],
+          [{ text: i18n.kSubscribed, callback_data: 'check_sub' }],
+        ]}
+      })
+      const prev = lastMsg.get(userId)
+      if (prev) pendingTrial.set(userId, prev)
+      return
+    }
+  }
+  const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
+  if (!result || result.error) {
+    const errMsg = result?.error || 'Unknown error'
+    const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
+    await showSubScreen(bot, chatId, userId, isUsed ? i18n.trialUsedShort : i18n.trialError(esc(errMsg)), {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kBuy, callback_data: 'show_plans' }]] }
+    })
+    return
+  }
+  const links = await getProxyLinks(userId)
+  await showSubScreen(bot, chatId, userId, i18n.trialActivated(trialDays, links.length > 0), {
+    parse_mode: 'HTML',
+    reply_markup: mergeKeyboard(buildLinksKeyboard(links, lang), [[{ text: i18n.kHome, callback_data: 'main_menu' }]])
+  })
+}
+
+async function handleTrialCallback(bot, query, userId, chatId, lang, i18n) {
+  const user = await getOrCreateUser(query.from)
+  const s    = await getSettings()
+  const trialDays = s.trial_days || 1
+  const channel   = (s.required_channel || '').trim().replace(/^@/, '')
+
+  if (user.trial_used) {
+    await editSubScreen(bot, query, i18n.trialUsed, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kBuy, callback_data: 'show_plans' }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+    })
+    return
+  }
+  if (channel) {
+    const subscribed = await isSubscribedToChannel(bot, userId, channel)
+    if (!subscribed) {
+      await editSubScreen(bot, query, i18n.trialChannel(channel, trialDays), {
+        parse_mode: 'HTML',
+        reply_markup: { inline_keyboard: [
+          [{ text: i18n.kSubscribe(channel), url: `https://t.me/${channel}` }],
+          [{ text: i18n.kSubscribed, callback_data: 'check_sub' }],
+          [{ text: i18n.kHome, callback_data: 'main_menu' }],
+        ]}
+      })
+      pendingTrial.set(userId, { chatId, msgId: query.message.message_id })
+      return
+    }
+    pendingTrial.delete(userId)
+  }
+  const result = await api(`/users/${userId}/trial`, { method: 'POST', body: {} })
+  if (!result || result.error) {
+    const errMsg = result?.error || 'Unknown error'
+    const isUsed = errMsg.toLowerCase().includes('already') || errMsg.toLowerCase().includes('trial')
+    await editSubScreen(bot, query, isUsed ? i18n.trialUsedShort : i18n.trialError(esc(errMsg)), {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kBuy, callback_data: 'show_plans' }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+    })
+    return
+  }
+  const links = await getProxyLinks(userId)
+  await editSubScreen(bot, query, i18n.trialActivated(trialDays, links.length > 0), {
+    parse_mode: 'HTML',
+    reply_markup: mergeKeyboard(buildLinksKeyboard(links, lang), [[{ text: i18n.kHome, callback_data: 'main_menu' }]])
+  })
+}
+
+async function handleMyAccess(bot, chatId, userId, lang, i18n) {
+  const user = await getOrCreateUser({ id: userId, first_name: '', last_name: '', username: '' })
+  const now  = Date.now()
+  const active = user.subscription_until && user.subscription_until > now
+  if (!active) {
+    await showSubScreen(bot, chatId, userId, i18n.noAccess, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kTrial, callback_data: 'trial' }, { text: i18n.kBuyShort, callback_data: 'show_plans' }]] }
+    })
+    return
+  }
+  const links = await getProxyLinks(userId)
+  const until = new Date(user.subscription_until).toLocaleDateString(i18n.locale)
+  const daysLeft = Math.ceil((user.subscription_until - now) / 86400000)
+  const badge = daysLeft <= 3 ? '🔴' : daysLeft <= 7 ? '🟡' : '🟢'
+  let text = i18n.accessTitle + i18n.accessUntil(badge, until) + i18n.accessDays(daysLeft)
+  if (links.length > 0) text += i18n.accessConnect
+  await showSubScreen(bot, chatId, userId, text, {
+    parse_mode: 'HTML',
+    reply_markup: mergeKeyboard(buildLinksKeyboard(links, lang), [[{ text: i18n.kRenew, callback_data: 'show_plans' }]])
+  })
+}
+
+async function handleMyAccessCallback(bot, query, userId, chatId, lang, i18n) {
+  const user = await getOrCreateUser(query.from)
+  const now  = Date.now()
+  const active = user.subscription_until && user.subscription_until > now
+  if (!active) {
+    await editSubScreen(bot, query, i18n.noAccess, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: i18n.kTrial, callback_data: 'trial' }, { text: i18n.kBuyShort, callback_data: 'show_plans' }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+    })
+    return
+  }
+  const links = await getProxyLinks(userId)
+  const until = new Date(user.subscription_until).toLocaleDateString(i18n.locale)
+  const daysLeft = Math.ceil((user.subscription_until - now) / 86400000)
+  const badge = daysLeft <= 3 ? '🔴' : daysLeft <= 7 ? '🟡' : '🟢'
+  let text = i18n.accessTitle + i18n.accessUntil(badge, until) + i18n.accessDays(daysLeft)
+  if (links.length > 0) text += i18n.accessConnect
+  await editSubScreen(bot, query, text, {
+    parse_mode: 'HTML',
+    reply_markup: mergeKeyboard(buildLinksKeyboard(links, lang), [[{ text: i18n.kRenew, callback_data: 'show_plans' }], [{ text: i18n.kHome, callback_data: 'main_menu' }]])
+  })
+}
+
+async function handleProfile(bot, chatId, userId, from, lang, i18n) {
+  const user   = await getOrCreateUser(from)
+  const now    = Date.now()
+  const active = user.subscription_until && user.subscription_until > now
+  const reg    = user.created_at ? new Date(user.created_at).toLocaleDateString(i18n.locale) : '—'
+  const name   = esc([from.first_name, from.last_name].filter(Boolean).join(' ') || '—')
+  let text = i18n.profileTitle + i18n.profileId(userId)
+  if (from.username) text += i18n.profileUsername(esc(from.username))
+  text += i18n.profileName(name) + i18n.profileReg(reg) + i18n.profileAccess(active) + i18n.profileRefs(user.referral_count || 0) + i18n.profileBalance((user.balance || 0).toFixed(2))
+  await showSubScreen(bot, chatId, userId, text, { parse_mode: 'HTML' })
+}
+
+async function handleProfileCallback(bot, query, userId, lang, i18n) {
+  const user   = await getOrCreateUser(query.from)
+  const now    = Date.now()
+  const active = user.subscription_until && user.subscription_until > now
+  const reg    = user.created_at ? new Date(user.created_at).toLocaleDateString(i18n.locale) : '—'
+  const name   = esc([query.from.first_name, query.from.last_name].filter(Boolean).join(' ') || '—')
+  let text = i18n.profileTitle + i18n.profileId(userId)
+  if (query.from.username) text += i18n.profileUsername(esc(query.from.username))
+  text += i18n.profileName(name) + i18n.profileReg(reg) + i18n.profileAccess(active) + i18n.profileRefs(user.referral_count || 0) + i18n.profileBalance((user.balance || 0).toFixed(2))
+  await editSubScreen(bot, query, text, { parse_mode: 'HTML', reply_markup: inlineBack(lang) })
+}
+
+async function handleSupport(bot, chatId, userId, lang, i18n) {
+  const s   = await getSettings()
+  const raw = (s.support_link || '').trim()
+  let link  = raw
+  if (link.startsWith('@')) link = `https://t.me/${link.slice(1)}`
+  else if (/^t\.me\//i.test(link)) link = `https://${link}`
+  const validUrl = /^https?:\/\//i.test(link)
+  const text = i18n.supportTitle + (raw ? i18n.supportLink(esc(raw)) : i18n.supportNoLink)
+  await showSubScreen(bot, chatId, userId, text, {
+    parse_mode: 'HTML',
+    reply_markup: validUrl
+      ? { inline_keyboard: [[{ text: i18n.kWrite, url: link }]] }
+      : undefined
+  })
+}
+
+async function handleSupportCallback(bot, query, lang, i18n) {
+  const s   = await getSettings()
+  const raw = (s.support_link || '').trim()
+  let link  = raw
+  if (link.startsWith('@')) link = `https://t.me/${link.slice(1)}`
+  else if (/^t\.me\//i.test(link)) link = `https://${link}`
+  const validUrl = /^https?:\/\//i.test(link)
+  const text = i18n.supportTitle + (raw ? i18n.supportLink(esc(raw)) : i18n.supportNoLink)
+  await editSubScreen(bot, query, text, {
+    parse_mode: 'HTML',
+    reply_markup: validUrl
+      ? { inline_keyboard: [[{ text: i18n.kWrite, url: link }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+      : inlineBack(lang)
+  })
+}
+
+async function handleReferral2(bot, chatId, userId, lang, i18n, me) {
+  const user = await getOrCreateUser({ id: userId, first_name: '', last_name: '', username: '' })
+  const s    = await getSettings()
+  const bonusDays = s.ref_bonus_days || 3
+  const refLink   = `https://t.me/${me.username}?start=${userId}`
+  const text = i18n.refTitle + i18n.refBonus(bonusDays) + i18n.refCount(user.referral_count || 0) + i18n.refLink(refLink)
+  await showSubScreen(bot, chatId, userId, text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[{ text: i18n.kShare, url: `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(i18n.refShareText)}` }]] }
+  })
+}
+
+async function handleReferralCallback(bot, query, userId, lang, i18n, me) {
+  const user = await getOrCreateUser(query.from)
+  const s    = await getSettings()
+  const bonusDays = s.ref_bonus_days || 3
+  const refLink   = `https://t.me/${me.username}?start=${userId}`
+  const text = i18n.refTitle + i18n.refBonus(bonusDays) + i18n.refCount(user.referral_count || 0) + i18n.refLink(refLink)
+  await editSubScreen(bot, query, text, {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[{ text: i18n.kShare, url: `https://t.me/share/url?url=${encodeURIComponent(refLink)}&text=${encodeURIComponent(i18n.refShareText)}` }], [{ text: i18n.kHome, callback_data: 'main_menu' }]] }
+  })
 }
 
 startBot()
