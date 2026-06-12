@@ -118,13 +118,25 @@ async function handleReferral(userId, referrerId) {
 }
 
 // ─── Keyboards ────────────────────────────────────────────────────────────────
-function mainMenuInlineKeyboard() {
+function mainMenuInlineKeyboard(lang = 'ru') {
+  if (lang === 'en') {
+    return {
+      inline_keyboard: [
+        [{ text: '🛡 Trial access', callback_data: 'trial' }, { text: '💳 Buy access', callback_data: 'show_plans' }],
+        [{ text: '🔑 My access', callback_data: 'my_access' }, { text: '👤 Profile', callback_data: 'profile' }],
+        [{ text: '💬 Support', callback_data: 'support' }, { text: '📖 About', callback_data: 'about' }],
+        [{ text: '👥 Referral program', callback_data: 'referral' }, { text: '💰 Top up balance', callback_data: 'topup' }],
+        [{ text: '🌐 Русский', callback_data: 'lang_ru' }],
+      ]
+    }
+  }
   return {
     inline_keyboard: [
       [{ text: '🛡 Тестовый доступ', callback_data: 'trial' }, { text: '💳 Купить доступ', callback_data: 'show_plans' }],
       [{ text: '🔑 Мой доступ', callback_data: 'my_access' }, { text: '👤 Профиль', callback_data: 'profile' }],
       [{ text: '💬 Поддержка', callback_data: 'support' }, { text: '📖 О нас', callback_data: 'about' }],
       [{ text: '👥 Реферальная программа', callback_data: 'referral' }, { text: '💰 Пополнить баланс', callback_data: 'topup' }],
+      [{ text: '🌐 English', callback_data: 'lang_en' }],
     ]
   }
 }
@@ -138,6 +150,15 @@ function plansKeyboard(plans) {
 function backKeyboard(cb = 'main_menu', label = '← Назад') {
   return { inline_keyboard: [[{ text: label, callback_data: cb }]] }
 }
+
+function backKeyboardL(lang, cb = 'main_menu') {
+  const label = lang === 'en' ? '← Back' : '← Назад'
+  return { inline_keyboard: [[{ text: label, callback_data: cb }]] }
+}
+
+// ─── User language preference (in-memory) ────────────────────────────────────
+const userLang = new Map() // userId → 'ru' | 'en'
+function getLang(userId) { return userLang.get(userId) || 'ru' }
 
 // ─── Message tracking: edit first, send if needed ────────────────────────────
 const lastMsg = new Map()
@@ -187,7 +208,7 @@ async function editScreen(bot, query, text, opts = {}) {
 }
 
 // ─── Screen builders ──────────────────────────────────────────────────────────
-function buildMainMenuText(settings) {
+function buildMainMenuText(settings, lang = 'ru') {
   const name = esc(settings.bot_name || 'Telemt Proxy')
   const welcome = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
   const features = settings.features || ''
@@ -209,7 +230,7 @@ function buildMainMenuText(settings) {
     text += `\n<blockquote>${formatted}</blockquote>\n`
   }
 
-  text += `\nВыберите нужное действие:`
+  text += lang === 'en' ? `\nChoose an action:` : `\nВыберите нужное действие:`
   return text
 }
 
@@ -252,10 +273,11 @@ async function startBot() {
       await handleReferral(msg.from.id, referrerId)
     }
     const s = await getSettings()
-    const text = buildMainMenuText(s)
+    const lang = getLang(msg.from.id)
+    const text = buildMainMenuText(s, lang)
     const r = await bot.sendMessage(msg.chat.id, text, {
       parse_mode: 'HTML',
-      reply_markup: mainMenuInlineKeyboard()
+      reply_markup: mainMenuInlineKeyboard(lang)
     })
     if (r?.ok && r?.result) {
       lastMsg.set(msg.from.id, { chatId: msg.chat.id, msgId: r.result.message_id })
@@ -268,12 +290,25 @@ async function startBot() {
     const data = query.data
     await bot.answerCallbackQuery(query.id)
 
+    // ── Переключение языка ────────────────────────────────────────────────────
+    if (data === 'lang_en' || data === 'lang_ru') {
+      const lang = data === 'lang_en' ? 'en' : 'ru'
+      userLang.set(userId, lang)
+      const s = await getSettings()
+      await editScreen(bot, query, buildMainMenuText(s, lang), {
+        parse_mode: 'HTML',
+        reply_markup: mainMenuInlineKeyboard(lang)
+      })
+      return
+    }
+
     // ── Главное меню ──────────────────────────────────────────────────────────
     if (data === 'main_menu') {
+      const lang = getLang(userId)
       const s = await getSettings()
-      await editScreen(bot, query, buildMainMenuText(s), {
+      await editScreen(bot, query, buildMainMenuText(s, lang), {
         parse_mode: 'HTML',
-        reply_markup: mainMenuInlineKeyboard()
+        reply_markup: mainMenuInlineKeyboard(lang)
       })
       return
     }
