@@ -60,6 +60,10 @@ export class TelegramBot {
     return this._call('answerCallbackQuery', { callback_query_id: id, ...opts })
   }
 
+  async deleteMessage(chatId, messageId) {
+    return this._call('deleteMessage', { chat_id: chatId, message_id: messageId })
+  }
+
   async getChatMember(chatId, userId) {
     return this._call('getChatMember', { chat_id: chatId, user_id: userId })
   }

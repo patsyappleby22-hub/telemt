@@ -376,6 +376,9 @@ async function startBot() {
     const lang   = getLang(userId)
     const i18n   = t(lang)
 
+    // Удаляем сообщение-нажатие кнопки, чтобы чат не засорялся
+    await bot.deleteMessage(chatId, msg.message_id).catch(() => {})
+
     // ── Язык ──────────────────────────────────────────────────────────────────
     if (matchesButton(text, 'kLang')) {
       const newLang = text === T.ru.kLang ? 'en' : 'ru'
