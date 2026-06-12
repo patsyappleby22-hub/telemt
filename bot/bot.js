@@ -546,11 +546,15 @@ async function startBot() {
     // ── Поддержка ──────────────────────────────────────────────────────────────
     if (data === 'support') {
       const s = await getSettings()
-      const link = s.support_link || ''
-      const text = i18n.supportTitle + (link ? i18n.supportLink(esc(link)) : i18n.supportNoLink)
+      const raw = (s.support_link || '').trim()
+      let link = raw
+      if (link.startsWith('@')) link = `https://t.me/${link.slice(1)}`
+      else if (/^t\.me\//i.test(link)) link = `https://${link}`
+      const validUrl = /^https?:\/\//i.test(link)
+      const text = i18n.supportTitle + (raw ? i18n.supportLink(esc(raw)) : i18n.supportNoLink)
       await editScreen(bot, query, text, {
         parse_mode: 'HTML',
-        reply_markup: link
+        reply_markup: validUrl
           ? { inline_keyboard: [[{ text: i18n.kWrite, url: link }], [{ text: i18n.kBack, callback_data: 'main_menu' }]] }
           : backKbd(lang)
       })
