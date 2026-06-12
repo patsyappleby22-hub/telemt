@@ -261,25 +261,29 @@ function getLang(userId) { return userLang.get(userId) || 'ru' }
 
 // ─── Main menu text ────────────────────────────────────────────────────────────
 function buildMainMenuText(settings, lang) {
-  const i18n    = t(lang)
-  const name    = esc(settings.bot_name    || 'Telemt Proxy')
-  const welcome = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
+  const i18n     = t(lang)
+  const name     = esc(settings.bot_name     || 'Telemt Proxy')
+  const welcome  = esc(settings.welcome_text || 'Быстрый и надёжный MTProxy')
   const features = settings.features || ''
 
   let text = `⚡️ <b>${name}</b>\n<i>${welcome}</i>\n`
+
   if (features) {
     const lines = features.split('\n').filter(Boolean)
     const formatted = lines.map(l => {
       const m = l.match(/^[-–—•*]\s*(.+)/)
       if (m) {
         const parts = m[1].split(' - ')
-        if (parts.length >= 2) return `— <b>${esc(parts[0].trim())}</b> · ${esc(parts.slice(1).join(' - ').trim())}`
-        return `— ${esc(m[1])}`
+        if (parts.length >= 2) {
+          return `✦ <b>${esc(parts[0].trim())}</b>\n    <i>${esc(parts.slice(1).join(' - ').trim())}</i>`
+        }
+        return `✦ <b>${esc(m[1])}</b>`
       }
-      return esc(l)
-    }).join('\n')
+      return `✦ <b>${esc(l)}</b>`
+    }).join('\n\n')
     text += `\n<blockquote>${formatted}</blockquote>\n`
   }
+
   text += `\n${i18n.chooseAction}`
   return text
 }
