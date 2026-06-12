@@ -8,6 +8,11 @@ export default defineConfig({
     port: 5000,
     allowedHosts: true,
     proxy: {
+      '/__mockup': {
+        target: 'http://127.0.0.1:23636',
+        changeOrigin: true,
+        ws: true,
+      },
       '/proxy': {
         target: 'http://127.0.0.1:9092',
         changeOrigin: true,

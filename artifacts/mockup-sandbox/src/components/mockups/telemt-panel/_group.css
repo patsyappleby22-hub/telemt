@@ -1,0 +1,62 @@
+@keyframes dash-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+.animate-dash-flow {
+  animation: dash-flow 1s linear infinite;
+}
+
+.animate-dash-flow-fast {
+  animation: dash-flow 0.3s linear infinite;
+}
+
+.animate-dash-flow-slow {
+  animation: dash-flow 2s linear infinite;
+}
+
+@keyframes pulse-glow-green {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.7), 0 0 30px rgba(34, 197, 94, 0.2);
+  }
+}
+
+.animate-pulse-green {
+  animation: pulse-glow-green 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-yellow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(234, 179, 8, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(234, 179, 8, 0.7), 0 0 30px rgba(234, 179, 8, 0.2);
+  }
+}
+
+.animate-pulse-yellow {
+  animation: pulse-glow-yellow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-red {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.7), 0 0 30px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.animate-pulse-red {
+  animation: pulse-glow-red 1s ease-in-out infinite;
+}
+
+.bg-grid-slate-900 {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(15, 23, 42, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(15, 23, 42, 0.5) 1px, transparent 1px);
+}
