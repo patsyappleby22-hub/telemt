@@ -50,12 +50,12 @@ const T = {
     // Keyboards
     kTrial:    '🛡 Тестовый доступ',
     kBuy:      '💳 Купить доступ',
-    kAccess:   '🔑 Доступ',
+    kAccess:   '🔑 Мой доступ',
     kProfile:  '👤 Профиль',
-    kSupport:  '💬 Чат',
+    kSupport:  '💬 Поддержка',
     kAbout:    '📖 О нас',
     kReferral: '👥 Рефералы',
-    kTopup:    '💰 Баланс',
+    kTopup:    '💰 Пополнить',
     kLang:     '🌐 English',
     kLangCb:   'lang_en',
     kHome:     '🏠 Главное меню',
@@ -120,12 +120,12 @@ const T = {
     chooseAction: 'Choose an action:',
     kTrial:    '🛡 Trial access',
     kBuy:      '💳 Buy access',
-    kAccess:   '🔑 Access',
+    kAccess:   '🔑 My access',
     kProfile:  '👤 Profile',
-    kSupport:  '💬 Chat',
+    kSupport:  '💬 Support',
     kAbout:    '📖 About',
     kReferral: '👥 Referrals',
-    kTopup:    '💰 Balance',
+    kTopup:    '💰 Top up',
     kLang:     '🌐 Русский',
     kLangCb:   'lang_ru',
     kHome:     '🏠 Main menu',
@@ -255,18 +255,10 @@ function mainMenuKeyboard(lang) {
   const i18n = t(lang)
   return {
     inline_keyboard: [
-      [{ text: i18n.kTrial, callback_data: 'trial' }],
-      [{ text: i18n.kBuy, callback_data: 'show_plans' }],
-      [
-        { text: i18n.kAccess,   callback_data: 'my_access' },
-        { text: i18n.kProfile,  callback_data: 'profile' },
-        { text: i18n.kSupport,  callback_data: 'support' },
-      ],
-      [
-        { text: i18n.kAbout,    callback_data: 'about' },
-        { text: i18n.kReferral, callback_data: 'referral' },
-        { text: i18n.kTopup,    callback_data: 'topup' },
-      ],
+      [{ text: i18n.kTrial, callback_data: 'trial' },    { text: i18n.kBuy,      callback_data: 'show_plans' }],
+      [{ text: i18n.kAccess, callback_data: 'my_access' }, { text: i18n.kProfile, callback_data: 'profile' }],
+      [{ text: i18n.kSupport, callback_data: 'support' },  { text: i18n.kAbout,   callback_data: 'about' }],
+      [{ text: i18n.kReferral, callback_data: 'referral' }, { text: i18n.kTopup,  callback_data: 'topup' }],
       [{ text: i18n.kLang, callback_data: i18n.kLangCb }],
     ]
   }
