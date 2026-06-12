@@ -13,7 +13,7 @@ export class TelegramBot {
   }
 
   async _call(method, body = {}) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const data = JSON.stringify(body)
       const url = new URL(`${this.baseUrl}/${method}`)
       const req = https.request({
@@ -32,8 +32,8 @@ export class TelegramBot {
           try { resolve(JSON.parse(buf)) } catch { resolve({ ok: false }) }
         })
       })
-      req.on('error', reject)
-      req.on('timeout', () => { req.destroy(); reject(new Error('timeout')) })
+      req.on('error', (e) => { console.error(`[tg] ${method} error:`, e.message); resolve({ ok: false }) })
+      req.on('timeout', () => { req.destroy(); console.error(`[tg] ${method} timeout`); resolve({ ok: false }) })
       req.write(data)
       req.end()
     })
