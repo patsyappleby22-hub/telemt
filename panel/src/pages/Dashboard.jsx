@@ -1,23 +1,68 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { Activity, Users, Wifi, Clock, AlertTriangle, CheckCircle, XCircle, RefreshCw, Server, Zap } from 'lucide-react'
-import StatCard from '../components/StatCard'
-import { makeApi, formatUptime, formatBytes } from '../api'
-import { useToast } from '../components/Toast'
+import { NavLink } from 'react-router-dom'
+import {
+  Users, Activity, AlertTriangle, Clock,
+  Globe, Server, ArrowUpRight, CheckCircle2, XCircle,
+  RefreshCw, Plus
+} from 'lucide-react'
+import { makeApi, formatUptime } from '../api'
 import { useNode } from '../NodeContext'
 
-function UpstreamBadge({ healthy }) {
-  return healthy
-    ? <span className="badge-green"><CheckCircle size={10} />Онлайн</span>
-    : <span className="badge-red"><XCircle size={10} />Офлайн</span>
+function StatCard({ title, value, sub, icon: Icon, loading, accent = 'cyan', trend }) {
+  const accentMap = {
+    cyan: 'text-cyan-400 bg-cyan-500/10',
+    emerald: 'text-emerald-400 bg-emerald-500/10',
+    amber: 'text-amber-400 bg-amber-500/10',
+    rose: 'text-rose-400 bg-rose-500/10',
+  }
+  const cls = accentMap[accent] || accentMap.cyan
+
+  return (
+    <div className="bg-[#15181e] border border-[#252830] rounded-xl p-5 relative overflow-hidden group">
+      <div className="absolute top-0 right-0 p-4 opacity-[0.06] group-hover:opacity-[0.12] transition-opacity pointer-events-none">
+        <Icon size={64} />
+      </div>
+      <div className="text-xs font-medium text-slate-400 mb-2">{title}</div>
+      {loading ? (
+        <div className="h-9 w-24 bg-[#1e2028] animate-pulse rounded-lg mb-1" />
+      ) : (
+        <div className="text-4xl font-light tracking-tight text-white flex items-baseline gap-2">
+          {value ?? '—'}
+          {trend && (
+            <span className="text-sm font-medium text-emerald-400 flex items-center">
+              <ArrowUpRight size={12} className="mr-0.5" />{trend}
+            </span>
+          )}
+        </div>
+      )}
+      <div className="text-xs text-slate-500 mt-1">{sub}</div>
+      <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${cls.split(' ')[1]} opacity-0 group-hover:opacity-100 transition-opacity`} />
+    </div>
+  )
+}
+
+function QualityBar({ value, max }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0
+  const color = pct < 30 ? 'bg-emerald-500' : pct < 70 ? 'bg-cyan-500' : pct < 90 ? 'bg-amber-500' : 'bg-rose-500'
+  return (
+    <div className="w-16 bg-[#1e2028] rounded-full h-1.5 overflow-hidden">
+      <div className={`h-1.5 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  )
+}
+
+function LatencyColor({ ms }) {
+  if (ms == null) return <span className="text-slate-600 font-mono">—</span>
+  const cls = ms < 50 ? 'text-emerald-400' : ms < 150 ? 'text-amber-400' : 'text-rose-400'
+  return <span className={`font-mono ${cls}`}>{Math.round(ms)} мс</span>
 }
 
 export default function Dashboard() {
   const { activeNode } = useNode()
-  const [health, setHealth] = useState(null)
-  const [ready, setReady] = useState(null)
-  const [sysInfo, setSysInfo] = useState(null)
   const [summary, setSummary] = useState(null)
   const [upstreams, setUpstreams] = useState(null)
+  const [sysInfo, setSysInfo] = useState(null)
+  const [ready, setReady] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -25,173 +70,263 @@ export default function Dashboard() {
   const load = useCallback(async (showRefresh = false) => {
     if (!activeNode) { setLoading(false); return }
     if (showRefresh) setRefreshing(true)
+    else setLoading(true)
     const api = makeApi(activeNode.id)
     try {
-      const [h, r, s, sum, up] = await Promise.allSettled([
-        api.health(), api.healthReady(), api.systemInfo(),
-        api.statsSummary(), api.statsUpstreams(),
+      const [sumRes, upRes, sysRes, readyRes] = await Promise.allSettled([
+        api.statsSummary(),
+        api.statsUpstreams(),
+        api.systemInfo(),
+        api.healthReady(),
       ])
-      if (h.status === 'fulfilled') setHealth(h.value?.data)
-      else setHealth(null)
-      if (r.status === 'fulfilled') setReady(r.value?.data)
-      else setReady(null)
-      if (s.status === 'fulfilled') setSysInfo(s.value?.data)
-      else setSysInfo(null)
-      if (sum.status === 'fulfilled') setSummary(sum.value?.data)
-      else setSummary(null)
-      if (up.status === 'fulfilled') setUpstreams(up.value?.data)
-      else setUpstreams(null)
-      const allFailed = [h,r,s,sum,up].every(x => x.status === 'rejected')
-      setError(allFailed ? (h.reason?.message || 'Нода недоступна') : null)
+      setSummary(sumRes.status === 'fulfilled' ? sumRes.value?.data : null)
+      setUpstreams(upRes.status === 'fulfilled' ? upRes.value?.data : null)
+      setSysInfo(sysRes.status === 'fulfilled' ? sysRes.value?.data : null)
+      setReady(readyRes.status === 'fulfilled' ? readyRes.value?.data : null)
+      const allFailed = [sumRes, upRes, sysRes, readyRes].every(r => r.status === 'rejected')
+      setError(allFailed ? (sumRes.reason?.message || 'Нода недоступна') : null)
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [activeNode])
+  }, [activeNode?.id])
 
-  useEffect(() => { setLoading(true); load() }, [activeNode?.id])
-  useEffect(() => { const t = setInterval(() => load(), 15000); return () => clearInterval(t) }, [load])
+  useEffect(() => { load() }, [activeNode?.id])
+  useEffect(() => {
+    const t = setInterval(() => load(), 15000)
+    return () => clearInterval(t)
+  }, [load])
 
   if (!activeNode) {
     return (
       <div className="flex flex-col items-center justify-center h-80 text-center">
-        <Server size={48} className="text-gray-700 mb-4" />
-        <div className="text-gray-400 font-medium">Нода не выбрана</div>
-        <div className="text-sm text-gray-600 mt-1">Добавьте и выберите ноду в разделе «Ноды»</div>
+        <div className="w-16 h-16 rounded-2xl bg-[#15181e] border border-[#252830] flex items-center justify-center mb-5">
+          <Server size={28} className="text-slate-600" />
+        </div>
+        <div className="text-slate-300 font-medium text-lg mb-1">Нода не выбрана</div>
+        <div className="text-sm text-slate-600 mb-5">Добавьте и выберите ноду для начала работы</div>
+        <NavLink
+          to="/nodes"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 text-sm font-medium hover:bg-cyan-500/20 transition-colors"
+        >
+          <Plus size={14} />
+          Перейти к нодам
+        </NavLink>
       </div>
     )
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-white">Дашборд</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{activeNode.name} · {activeNode.url}</p>
-        </div>
-        <button onClick={() => load(true)} disabled={refreshing} className="btn-ghost">
-          <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          Обновить
-        </button>
-      </div>
+  const ups = upstreams?.upstreams || []
+  const maxLatency = ups.reduce((m, u) => Math.max(m, u.effective_latency_ms || 0), 0)
+  const badClasses = summary?.connections_bad_by_class || []
+  const totalBad = summary?.connections_bad_total || 0
 
+  return (
+    <div className="space-y-4">
       {error && (
-        <div className="card border-red-800/50 bg-red-950/20 flex items-center gap-3">
-          <XCircle size={18} className="text-red-400 flex-shrink-0" />
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20">
+          <XCircle size={16} className="text-rose-400 flex-shrink-0" />
           <div>
-            <div className="text-sm font-medium text-red-300">Нода недоступна</div>
-            <div className="text-xs text-red-500 mt-0.5">{error}</div>
+            <div className="text-sm font-medium text-rose-300">Нода недоступна</div>
+            <div className="text-xs text-rose-500/80 mt-0.5">{error}</div>
           </div>
+          <button
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 text-xs hover:bg-rose-500/20 transition-colors"
+          >
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            Повторить
+          </button>
         </div>
       )}
 
-      {health && (
-        <div className={`card border flex items-center gap-3 ${
-          health.status === 'ok' ? 'border-green-800/40 bg-green-950/10' : 'border-yellow-800/40 bg-yellow-950/10'
-        }`}>
-          {health.status === 'ok'
-            ? <CheckCircle size={18} className="text-green-400 flex-shrink-0" />
-            : <AlertTriangle size={18} className="text-yellow-400 flex-shrink-0" />}
-          <div className="flex-1">
-            <div className="text-sm font-medium text-white">
-              {health.status === 'ok' ? 'Работает' : health.status}
-              {health.read_only && <span className="ml-2 badge-yellow">Только чтение</span>}
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Пользователей"
+          value={summary?.configured_users?.toLocaleString('ru-RU')}
+          sub="настроено в системе"
+          icon={Users}
+          loading={loading}
+          accent="cyan"
+        />
+        <StatCard
+          title="Соединений"
+          value={summary?.connections_total?.toLocaleString('ru-RU')}
+          sub="всего за время работы"
+          icon={Activity}
+          loading={loading}
+          accent="emerald"
+        />
+        <StatCard
+          title="Отклонено"
+          value={summary?.connections_bad_total?.toLocaleString('ru-RU')}
+          sub="ошибок соединений"
+          icon={AlertTriangle}
+          loading={loading}
+          accent="amber"
+        />
+        <StatCard
+          title="Uptime"
+          value={summary ? formatUptime(summary.uptime_seconds) : null}
+          sub={sysInfo ? `v${sysInfo.version}` : 'время работы'}
+          icon={Clock}
+          loading={loading}
+          accent="emerald"
+        />
+      </div>
+
+      {/* Main grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        {/* Upstream Routing Table */}
+        <div className="lg:col-span-8 bg-[#15181e] border border-[#252830] rounded-xl flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#252830]">
+            <div>
+              <div className="text-sm font-medium text-slate-200">Маршрутизация DC Telegram</div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                Задержки и доступность апстримов
+                {ready && (
+                  <span className="ml-2 text-slate-600">
+                    · {ready.healthy_upstreams}/{ready.total_upstreams} активны
+                  </span>
+                )}
+              </div>
             </div>
-            {ready && (
-              <div className="text-xs text-gray-500 mt-0.5">
-                Апстримов: {ready.healthy_upstreams}/{ready.total_upstreams} активны
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-600 hidden sm:inline">Обновление: 15 сек</span>
+              <button
+                onClick={() => load(true)}
+                disabled={refreshing}
+                className="flex items-center justify-center h-7 w-7 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-[#1e2028] transition-colors"
+              >
+                <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="p-4 space-y-3">
+              {[1,2,3,4,5].map(i => (
+                <div key={i} className="h-10 bg-[#1a1d24] animate-pulse rounded-lg" />
+              ))}
+            </div>
+          ) : ups.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-[11px] font-medium text-slate-500 uppercase tracking-wider bg-[#12151a] border-b border-[#252830]">
+                  <tr>
+                    <th className="px-5 py-3 text-left">Адрес</th>
+                    <th className="px-5 py-3 text-left hidden sm:table-cell">Тип</th>
+                    <th className="px-5 py-3 text-right">Пинг</th>
+                    <th className="px-5 py-3 text-right">Нагрузка</th>
+                    <th className="px-5 py-3">Состояние</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#1e2028]">
+                  {ups.map((u, i) => (
+                    <tr key={i} className="hover:bg-[#1a1d24] transition-colors group">
+                      <td className="px-5 py-3 font-medium text-slate-300 flex items-center gap-2">
+                        <Globe size={13} className="text-slate-500 flex-shrink-0" />
+                        <span className="font-mono text-xs">{u.address}</span>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-slate-500 hidden sm:table-cell capitalize">
+                        {u.route_kind || '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right">
+                        <LatencyColor ms={u.effective_latency_ms} />
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex justify-end">
+                          <QualityBar value={u.effective_latency_ms || 0} max={maxLatency || 1} />
+                        </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        {u.healthy ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <CheckCircle2 size={10} />Онлайн
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                            <XCircle size={10} />Офлайн
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-slate-600">
+              <Globe size={32} className="mb-3 opacity-40" />
+              <div className="text-sm">{error ? 'Нет данных' : 'Апстримы не настроены'}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Right column: Error breakdown + System Info */}
+        <div className="lg:col-span-4 flex flex-col gap-4">
+          {/* Error breakdown */}
+          <div className="bg-[#15181e] border border-[#252830] rounded-xl flex flex-col overflow-hidden flex-1">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#252830]">
+              <div className="text-sm font-medium text-slate-200">Сбои по типам</div>
+              {totalBad > 0 && (
+                <span className="text-xs font-mono text-slate-500">{totalBad.toLocaleString('ru-RU')} всего</span>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="p-4 space-y-3">
+                {[1,2,3].map(i => <div key={i} className="h-7 bg-[#1a1d24] animate-pulse rounded" />)}
+              </div>
+            ) : badClasses.length > 0 ? (
+              <div className="p-4 space-y-3">
+                {badClasses.map((c) => {
+                  const pct = totalBad > 0 ? Math.min(100, (c.total / totalBad) * 100) : 0
+                  return (
+                    <div key={c.class}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-slate-400 truncate max-w-[60%]">{c.class}</span>
+                        <span className="text-xs font-mono text-slate-500">{c.total.toLocaleString('ru-RU')}</span>
+                      </div>
+                      <div className="w-full bg-[#1e2028] rounded-full h-1">
+                        <div className="h-1 bg-rose-500/60 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 text-slate-600">
+                <CheckCircle2 size={28} className="mb-2 text-emerald-500/40" />
+                <div className="text-sm">{error ? 'Нет данных' : 'Сбоев не зафиксировано'}</div>
               </div>
             )}
           </div>
+
+          {/* System info compact */}
           {sysInfo && (
-            <div className="text-xs text-gray-500 text-right">
-              <div>v{sysInfo.version}</div>
-              <div>uptime: {formatUptime(sysInfo.uptime_seconds)}</div>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Соединений" value={summary?.connections_total?.toLocaleString()} sub="всего за время работы" icon={Activity} color="blue" loading={loading} />
-        <StatCard title="Пользователей" value={summary?.configured_users} sub="настроено" icon={Users} color="purple" loading={loading} />
-        <StatCard title="Плохих соед." value={summary?.connections_bad_total?.toLocaleString()} sub="отклонено/ошибок" icon={AlertTriangle} color="yellow" loading={loading} />
-        <StatCard title="Uptime" value={summary ? formatUptime(summary.uptime_seconds) : null} sub="время работы" icon={Clock} color="green" loading={loading} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-            <Wifi size={15} className="text-blue-400" />Апстримы (DC)
-          </h2>
-          {loading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-dark-700 animate-pulse rounded-lg" />)}</div>
-          ) : upstreams?.upstreams?.length > 0 ? (
-            <div className="space-y-2">
-              {upstreams.upstreams.map((u) => (
-                <div key={u.upstream_id} className="flex items-center gap-3 p-3 bg-dark-700/60 rounded-lg">
-                  <UpstreamBadge healthy={u.healthy} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{u.address}</div>
-                    <div className="text-xs text-gray-500">{u.route_kind} · вес {u.weight}</div>
+            <div className="bg-[#15181e] border border-[#252830] rounded-xl p-4">
+              <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">Система</div>
+              <div className="space-y-2">
+                {[
+                  ['Версия', `v${sysInfo.version}`],
+                  ['Uptime', formatUptime(sysInfo.uptime_seconds)],
+                  sysInfo.os_version ? ['ОС', sysInfo.os_version] : null,
+                  sysInfo.cpu_model ? ['CPU', sysInfo.cpu_model] : null,
+                ].filter(Boolean).map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">{k}</span>
+                    <span className="text-xs font-mono text-slate-300 truncate max-w-[60%] text-right">{v}</span>
                   </div>
-                  <div className="text-xs text-gray-400">
-                    {u.effective_latency_ms != null ? `${u.effective_latency_ms.toFixed(0)}мс` : '—'}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-600 text-sm">
-              {error ? 'Нет данных' : 'Апстримы не настроены'}
-            </div>
-          )}
-        </div>
-
-        <div className="card">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-            <Zap size={15} className="text-yellow-400" />Ошибки по типам
-          </h2>
-          {loading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-8 bg-dark-700 animate-pulse rounded" />)}</div>
-          ) : summary?.connections_bad_by_class?.length > 0 ? (
-            <div className="space-y-2">
-              {summary.connections_bad_by_class.map((c) => (
-                <div key={c.class} className="flex items-center gap-3">
-                  <div className="text-xs text-gray-500 w-40 truncate">{c.class}</div>
-                  <div className="flex-1 bg-dark-700 rounded-full h-2 overflow-hidden">
-                    <div className="h-full bg-red-500/70 rounded-full"
-                      style={{ width: `${Math.min(100, (c.total / (summary.connections_bad_total || 1)) * 100)}%` }} />
-                  </div>
-                  <div className="text-xs text-gray-400 w-12 text-right">{c.total}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-600 text-sm">
-              {error ? 'Нет данных' : 'Ошибок не зафиксировано'}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {sysInfo && (
-        <div className="card">
-          <h2 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-            <Server size={15} className="text-purple-400" />Информация о системе
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(sysInfo).map(([k, v]) => (
-              <div key={k} className="p-3 bg-dark-700/50 rounded-lg">
-                <div className="text-xs text-gray-500 mb-1 capitalize">{k.replace(/_/g, ' ')}</div>
-                <div className="text-sm font-medium text-white break-all">
-                  {typeof v === 'number' && k.includes('uptime') ? formatUptime(v) : String(v)}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
